@@ -1,0 +1,275 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\title{A Guide to Manifolds, Manifold Optimization, and the Stiefel Manifold}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\section{Introduction}
+This document provides a comprehensive overview of manifolds, manifold optimization, and specifically the Stiefel manifold. It also includes a detailed learning path for those interested in studying this topic.
+
+\section{Manifolds}
+
+\subsection{Definition}
+A \textbf{manifold} $\mathcal{M}$ is a topological space that locally resembles Euclidean space near each point. Formally:
+
+\begin{itemize}
+    \item For every point $p \in \mathcal{M}$, there exists a neighborhood $U \subseteq \mathcal{M}$ containing $p$
+    \item There exists a homeomorphism $\phi: U \to V$, where $V \subseteq \mathbb{R}^n$ is open
+    \item The pair $(U, \phi)$ is called a \textbf{chart}
+    \item A collection of charts covering $\mathcal{M}$ is called an \textbf{atlas}
+\end{itemize}
+
+\subsection{Key Properties}
+\begin{itemize}
+    \item \textbf{Local Euclideanness}: Near every point, the manifold looks like $\mathbb{R}^n$
+    \item \textbf{Global structure}: Can be curved or have nontrivial topology
+    \item \textbf{Dimension}: If locally like $\mathbb{R}^n$, the manifold is $n$-dimensional
+\end{itemize}
+
+\subsection{Examples}
+\begin{align*}
+    \text{Sphere: } & S^{n-1} = \{x \in \mathbb{R}^n : \|x\| = 1\} \\
+    \text{Torus: } & T^2 = S^1 \times S^1 \\
+    \text{Rotation matrices: } & SO(n) = \{R \in \mathbb{R}^{n\times n} : R^T R = I, \det(R) = 1\}
+\end{align*}
+
+\section{Manifold Optimization}
+
+\subsection{Problem Formulation}
+Manifold optimization solves problems of the form:
+\[
+\min_{x \in \mathcal{M}} f(x)
+\]
+where $\mathcal{M}$ is a manifold and $f: \mathcal{M} \to \mathbb{R}$ is a smooth function.
+
+\subsection{Why Manifold Optimization?}
+\begin{itemize}
+    \item \textbf{Natural constraints}: Many problems have constraints that form manifolds
+    \item \textbf{Better algorithms}: Exploit geometric structure for efficiency
+    \item \textbf{Numerical stability}: Avoid constraint drift
+    \item \textbf{Theoretical insights}: Deep connections to geometry
+\end{itemize}
+
+\subsection{Key Geometric Concepts}
+
+\subsubsection{Tangent Space}
+At a point $x \in \mathcal{M}$, the tangent space $T_x\mathcal{M}$ is the set of all directions in which one can tangentially pass through $x$.
+
+\subsubsection{Riemannian Metric}
+A smoothly varying inner product $\langle \cdot, \cdot \rangle_x$ on each tangent space $T_x\mathcal{M}$.
+
+\subsubsection{Retraction}
+A mapping $R_x: T_x\mathcal{M} \to \mathcal{M}$ that approximates the exponential map:
+\begin{itemize}
+    \item $R_x(0) = x$
+    \item $\frac{d}{dt} R_x(t\xi)\big|_{t=0} = \xi$ for all $\xi \in T_x\mathcal{M}$
+\end{itemize}
+
+\subsubsection{Riemannian Gradient}
+For $f: \mathcal{M} \to \mathbb{R}$, the Riemannian gradient $\operatorname{grad} f(x) \in T_x\mathcal{M}$ satisfies:
+\[
+\langle \operatorname{grad} f(x), \xi \rangle_x = D f(x)[\xi] \quad \forall \xi \in T_x\mathcal{M}
+\]
+where $D f(x)[\xi]$ is the directional derivative.
+
+\subsection{Riemannian Gradient Descent Algorithm}
+\begin{enumerate}
+    \item Initialize $x_0 \in \mathcal{M}$
+    \item For $k = 0, 1, 2, \dots$:
+    \begin{enumerate}
+        \item Compute gradient $\xi_k = -\operatorname{grad} f(x_k)$
+        \item Choose step size $\alpha_k > 0$
+        \item Update: $x_{k+1} = R_{x_k}(\alpha_k \xi_k)$
+    \end{enumerate}
+\end{enumerate}
+
+\section{The Stiefel Manifold}
+
+\subsection{Definition}
+The \textbf{Stiefel manifold} $\operatorname{St}(p, n)$ is defined as:
+\[
+\operatorname{St}(p, n) = \{X \in \mathbb{R}^{n \times p} : X^T X = I_p\}
+\]
+where:
+\begin{itemize}
+    \item $n$: ambient dimension
+    \item $p$: number of orthonormal vectors ($p \leq n$)
+    \item $I_p$: $p \times p$ identity matrix
+\end{itemize}
+
+\subsection{Special Cases}
+\begin{align*}
+    \operatorname{St}(1, n) &= S^{n-1} \quad \text{(sphere)} \\
+    \operatorname{St}(n, n) &= O(n) \quad \text{(orthogonal group)} \\
+    \operatorname{St}(n-1, n) &= SO(n) \quad \text{(rotation matrices, with determinant constraint)}
+\end{align*}
+
+\subsection{Geometry of Stiefel Manifold}
+
+\subsubsection{Dimension}
+\[
+\dim(\operatorname{St}(p, n)) = np - \frac{p(p+1)}{2}
+\]
+
+\subsubsection{Tangent Space at $X$}
+\[
+T_X\operatorname{St}(p, n) = \{Z \in \mathbb{R}^{n \times p} : X^T Z + Z^T X = 0\}
+\]
+Equivalently:
+\[
+T_X\operatorname{St}(p, n) = \{X\Omega + X_\perp K : \Omega^T = -\Omega, K \in \mathbb{R}^{(n-p)\times p}\}
+\]
+where $X_\perp$ completes $X$ to an orthonormal basis.
+
+\subsubsection{Riemannian Metric}
+The canonical metric (induced from $\mathbb{R}^{n \times p}$):
+\[
+\langle Z_1, Z_2 \rangle_X = \operatorname{tr}(Z_1^T Z_2)
+\]
+
+\subsubsection{Retractions}
+Common retractions for $\operatorname{St}(p, n)$:
+\begin{align*}
+    \text{QR retraction:} & \quad R_X^{\text{QR}}(\xi) = \operatorname{qf}(X + \xi) \\
+    \text{Polar retraction:} & \quad R_X^{\text{polar}}(\xi) = (X + \xi)(I_p + \xi^T \xi)^{-1/2} \\
+    \text{Cayley retraction:} & \quad R_X^{\text{Cayley}}(\xi) = (I - \tfrac{1}{2}W)^{-1}(I + \tfrac{1}{2}W)X
+\end{align*}
+where $W = \xi X^T - X\xi^T$ and $\operatorname{qf}(A)$ extracts Q from QR decomposition.
+
+\subsection{Applications}
+\begin{itemize}
+    \item \textbf{Principal Component Analysis (PCA)}: $\min_{X \in \operatorname{St}(p, n)} -\operatorname{tr}(X^T A X)$
+    \item \textbf{Orthogonal Procrustes}: $\min_{X \in \operatorname{St}(p, n)} \|AX - B\|_F^2$
+    \item \textbf{Independent Component Analysis (ICA)}
+    \item \textbf{Low-rank matrix completion}
+    \item \textbf{Neural networks with orthogonal weights}
+\end{itemize}
+
+\section{Learning Path for Manifold Optimization}
+
+\subsection{Prerequisites}
+\begin{table}[h]
+    \centering
+    \begin{tabular}{p{0.2\textwidth} p{0.35\textwidth} p{0.35\textwidth}}
+        \toprule
+        \textbf{Topic} & \textbf{Key Concepts} & \textbf{Recommended Texts} \\
+        \midrule
+        Linear Algebra & SVD, QR, projections, matrix calculus & Axler, Horn \& Johnson \\
+        \addlinespace
+        Multivariable Calculus & Gradients, Hessians, chain rule & Spivak's \emph{Calculus on Manifolds} \\
+        \addlinespace
+        Optimization & Gradient descent, Newton, Lagrange multipliers & Nocedal \& Wright \\
+        \addlinespace
+        Differential Geometry & Tangent spaces, curves, surfaces & O'Neill, do Carmo \\
+        \addlinespace
+        Topology & Continuity, compactness, manifolds & Munkres (Ch. 1-3) \\
+        \bottomrule
+    \end{tabular}
+    \caption{Prerequisite topics for manifold optimization}
+\end{table}
+
+\subsection{Primary Textbooks}
+\begin{enumerate}
+    \item \textbf{Practical Focus}: 
+    \begin{itemize}
+        \item \emph{Optimization Algorithms on Matrix Manifolds} by Absil, Mahony, Sepulchre
+        \item Free online: \url{https://press.princeton.edu/absil}
+    \end{itemize}
+    
+    \item \textbf{Theoretical Foundation}:
+    \begin{itemize}
+        \item \emph{An Introduction to Optimization on Smooth Manifolds} by Nicolas Boumal
+        \item Free PDF: \url{https://www.nicolasboumal.net/book}
+    \end{itemize}
+    
+    \item \textbf{Applications in ML}:
+    \begin{itemize}
+        \item Survey paper: \emph{Manifold Optimization for Machine Learning} by Hu et al. (2020)
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Implementation Libraries}
+\begin{table}[h]
+    \centering
+    \begin{tabular}{p{0.2\textwidth} p{0.4\textwidth} p{0.3\textwidth}}
+        \toprule
+        \textbf{Library} & \textbf{Language} & \textbf{Features} \\
+        \midrule
+        Manopt & MATLAB & Comprehensive, well-documented \\
+        \addlinespace
+        Pymanopt & Python & User-friendly, autodiff support \\
+        \addlinespace
+        ROPTLIB & C++ & Efficient, advanced algorithms \\
+        \addlinespace
+        McTorch & Python (PyTorch) & Deep learning integration \\
+        \bottomrule
+    \end{tabular}
+    \caption{Software libraries for manifold optimization}
+\end{table}
+
+\subsection{Sample Study Plan}
+\begin{table}[h]
+    \centering
+    \begin{tabular}{p{0.15\textwidth} p{0.4\textwidth} p{0.35\textwidth}}
+        \toprule
+        \textbf{Time} & \textbf{Focus} & \textbf{Activities} \\
+        \midrule
+        Month 1-2 & Foundations & Review LA, read Boumal Ch. 1-4, implement sphere example \\
+        \addlinespace
+        Month 3-4 & Core concepts & Study retractions, Riemannian gradient, implement Stiefel examples \\
+        \addlinespace
+        Month 5-6 & Applications & Choose domain, reproduce papers, modify algorithms \\
+        \bottomrule
+    \end{tabular}
+    \caption{Suggested study schedule}
+\end{table}
+
+\subsection{Common Examples to Implement}
+\begin{enumerate}[label=\arabic*.]
+    \item \textbf{Rayleigh quotient on sphere}:
+    \[
+    \min_{x \in S^{n-1}} -x^T A x
+    \]
+    
+    \item \textbf{PCA on Stiefel manifold}:
+    \[
+    \min_{X \in \operatorname{St}(p,n)} -\operatorname{tr}(X^T \Sigma X)
+    \]
+    where $\Sigma$ is covariance matrix.
+    
+    \item \textbf{Orthogonal Procrustes}:
+    \[
+    \min_{X \in \operatorname{St}(p,n)} \|AX - B\|_F^2
+    \]
+    
+    \item \textbf{Matrix completion}:
+    \[
+    \min_{X \in \mathbb{R}^{m \times n}, \operatorname{rank}(X)=r} \sum_{(i,j)\in\Omega} (X_{ij} - M_{ij})^2
+    \]
+\end{enumerate}
+
+\section{Conclusion}
+Manifold optimization provides a powerful framework for solving constrained optimization problems by exploiting their geometric structure. The Stiefel manifold is particularly important due to the ubiquity of orthogonality constraints in applications ranging from PCA to deep learning. With modern libraries and comprehensive textbooks, this field has become increasingly accessible to practitioners and researchers alike.
+
+\subsection*{Further Resources}
+\begin{itemize}
+    \item \textbf{Video lectures}: Frederic Schuller's geometry lectures on YouTube
+    \item \textbf{Research papers}: Search arXiv for "manifold optimization", "Riemannian optimization"
+    \item \textbf{GitHub}: Example implementations in Manopt/Pymanopt repositories
+    \item \textbf{Community}: Manopt user forum, Riemannian optimization workshops
+\end{itemize}
+
+\end{document}

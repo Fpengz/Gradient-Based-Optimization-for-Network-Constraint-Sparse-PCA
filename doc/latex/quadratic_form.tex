@@ -1,0 +1,128 @@
+\documentclass{article}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{booktabs}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\title{On Quadratic Forms, Bilinear Forms, and Convexity}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section*{1. Bilinear vs Quadratic Forms}
+
+\subsection*{1.1 Definitions}
+Let $V$ be a vector space over a field $F$.
+
+\textbf{Quadratic form}: A map $Q \colon V \to F$ such that:
+\begin{enumerate}
+    \item $Q(av) = a^2 Q(v)$ for $a \in F$, $v \in V$.
+    \item The map $B(v,w) = Q(v+w) - Q(v) - Q(w)$ is \textbf{bilinear} and symmetric.
+\end{enumerate}
+Thus, every quadratic form induces a symmetric bilinear form.
+
+\textbf{Bilinear form}: A map $B \colon V \times V \to F$ that is linear in each argument separately.
+\begin{itemize}
+    \item If $B$ is symmetric ($B(v,w) = B(w,v)$), then $Q(v) = B(v,v)$ is a quadratic form.
+    \item In characteristic $\neq 2$, symmetric bilinear forms and quadratic forms are equivalent via polarization.
+\end{itemize}
+
+\subsection*{1.2 Why Bilinear Forms are Often Preferred}
+Bilinear forms are frequently more convenient than quadratic forms due to their richer algebraic structure:
+
+\begin{itemize}
+    \item \textbf{Algebraic manipulation}: A bilinear form $B(v,w)$ can be represented as a matrix: $B(v,w) = v^\top M w$.
+    \item \textbf{Geometric interpretation}: They directly define orthogonality: $v \perp w \iff B(v,w) = 0$.
+    \item \textbf{Differential viewpoint}: For $F = \mathbb{R}$ or $\mathbb{C}$, the bilinear form is the polarization of $Q$:
+    \[
+    B(v,w) = \frac{1}{2} \big( Q(v+w) - Q(v) - Q(w) \big)
+    \]
+    which corresponds to the Hessian of $Q$ at zero.
+    \item \textbf{Spectral theory}: Symmetric bilinear forms have a complete diagonalization theory (Sylvester's law of inertia).
+\end{itemize}
+
+\subsection*{1.3 Special Case: Characteristic 2}
+In characteristic 2, quadratic forms and symmetric bilinear forms are \textit{not} equivalent. Symmetric bilinear forms become alternating if the diagonal is zero, losing information about $Q(v)$. Thus, in char 2, quadratic forms are more general.
+
+\subsection*{1.4 Summary Comparison}
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Context} & \textbf{Why bilinear forms are often favored} \\
+\midrule
+Algebra (char $\neq 2$) & Easier for computing interactions between vectors \\
+Geometry (inner products) & Directly defines angles, lengths via polarization \\
+Differential calculus & Natural as Hessian/tangent space metric \\
+Matrix representation & Corresponds directly to $v^\top M w$ \\
+Characteristic 2 & Quadratic forms are more general; bilinear isn't "better" \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Conclusion}: In characteristic $\neq 2$, bilinear forms (especially symmetric ones) and quadratic forms are equivalent, but the bilinear viewpoint is often more convenient because it encodes relational information between vectors and interacts well with linear algebra techniques.
+
+\section*{2. Convexity of Quadratic Forms}
+
+\subsection*{2.1 Definition and Convexity Criteria}
+A quadratic form is defined as:
+\[
+Q(x) = x^\top A x
+\]
+where $A$ is a symmetric $n \times n$ matrix and $x \in \mathbb{R}^n$.
+
+The convexity of $Q(x)$ depends entirely on $A$:
+\begin{itemize}
+    \item If $A$ is \textbf{positive semidefinite} ($x^\top A x \ge 0$ for all $x$), then $Q$ is \textbf{convex}.
+    \item If $A$ is \textbf{positive definite}, $Q$ is \textbf{strictly convex}.
+    \item If $A$ is \textbf{negative semidefinite}, $Q$ is \textbf{concave}.
+    \item If $A$ is \textbf{indefinite} (has both positive and negative eigenvalues), $Q$ is \textbf{neither convex nor concave}.
+\end{itemize}
+
+\subsection*{2.2 Example of Nonconvex Quadratic Form}
+Let $A = \begin{bmatrix}1 & 0 \\ 0 & -1\end{bmatrix}$. Then:
+\[
+Q(x_1, x_2) = x_1^2 - x_2^2
+\]
+Along $x_2 = 0$: $Q(x_1,0) = x_1^2$ (convex). \\
+Along $x_1 = 0$: $Q(0, x_2) = -x_2^2$ (concave). \\
+Thus $Q$ is \textbf{nonconvex} (a saddle function).
+
+\subsection*{2.3 Convexity Test}
+For a twice-differentiable function, convexity requires a positive semidefinite Hessian. For $Q(x) = x^\top A x$:
+\[
+\nabla^2 Q(x) = 2A
+\]
+Therefore:
+\[
+Q \text{ is convex} \iff A \text{ is positive semidefinite}.
+\]
+
+\subsection*{2.4 Extended Case: Quadratic Functions}
+General quadratic functions have the form:
+\[
+f(x) = x^\top A x + b^\top x + c
+\]
+Convexity still depends only on $A$, since $\nabla^2 f(x) = 2A$.
+
+\subsection*{2.5 Visual Intuition}
+\begin{itemize}
+    \item Positive definite: Bowl shape (convex)
+    \item Negative definite: Upside-down bowl (concave)
+    \item Indefinite: Saddle shape (nonconvex)
+\end{itemize}
+
+\subsection*{2.6 Clarifying the Confusion}
+The statement "quadratic forms are nonconvex" is misleading. Quadratic forms are:
+\begin{itemize}
+    \item Convex if $A \succeq 0$
+    \item Concave if $A \preceq 0$
+    \item Nonconvex if $A$ is indefinite
+\end{itemize}
+The confusion arises because indefinite quadratic forms (saddles) appear frequently in applications, leading to overgeneralization.
+
+\textbf{Final note}: Quadratic forms are not inherently nonconvex; their convexity is determined by the definiteness of the associated symmetric matrix.
+
+\end{document}

@@ -1,0 +1,262 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath,amssymb}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc}
+\usepackage{geometry}
+\usepackage{microtype}
+\usepackage{booktabs}
+
+\geometry{margin=1in}
+
+% Help avoid overfull lines in text-heavy notes.
+\setlength{\emergencystretch}{3em}
+
+\title{Sparse PCA: Derivation, Intuition, and Visualization}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Sparse PCA Objective}
+
+Classical PCA solves
+\[
+\min_{V} \; \|X - ZV^\top\|_F^2, \qquad \text{s.t. } V^\top V = I.
+\]
+Here
+\begin{itemize}
+    \item $X \in \mathbb{R}^{n \times p}$ is the data matrix,
+    \item $V \in \mathbb{R}^{p \times k}$ are (dense) loadings,
+    \item $Z \in \mathbb{R}^{n \times k}$ are principal component scores.
+\end{itemize}
+
+Sparse PCA seeks \emph{sparse} loadings $\beta_i$ that approximate the dense principal components $Z_i$:
+\[
+\min_{\beta_i} \; \|Z_i - X\beta_i\|_2^2 + \lambda \|\beta_i\|_2^2 + \lambda_1 \|\beta_i\|_1,
+\]
+where
+\begin{itemize}
+    \item $Z_i = Xv_i$ is the $i$th dense score vector,
+    \item $\beta_i \in \mathbb{R}^p$ is the sparse loading vector,
+    \item $\lambda$ and $\lambda_1$ control $\ell_2$ and $\ell_1$ regularization.
+\end{itemize}
+
+\section{Matrix Form Derivation (One Component)}
+
+Start with the one-component reconstruction objective:
+\[
+\min_{v_i} \; \|X - z_i v_i^\top\|_F^2.
+\]
+Using $\|A\|_F^2 = \mathrm{tr}(A^\top A)$,
+\[
+\|X - z_i v_i^\top\|_F^2 = \mathrm{tr}\big((X - z_i v_i^\top)^\top (X - z_i v_i^\top)\big).
+\]
+Expanding gives
+\[
+\mathrm{tr}(X^\top X)
+- 2\,\mathrm{tr}(v_i^\top X^\top z_i)
++ \mathrm{tr}\big(v_i^\top (z_i^\top z_i) v_i\big).
+\]
+Define $\beta_i := v_i$ and add $\ell_1$/$\ell_2$ penalties:
+\[
+\min_{\beta_i}
+\; \mathrm{tr}\big(\beta_i^\top (z_i^\top z_i) \beta_i\big)
+- 2\,\mathrm{tr}(\beta_i^\top X^\top z_i)
++ \lambda\,\mathrm{tr}(\beta_i^\top \beta_i)
++ \lambda_1\|\beta_i\|_1.
+\]
+Since $z_i^\top z_i$ is a scalar, this is equivalent (up to an additive constant) to
+\[
+\min_{\beta_i} \; \|Z_i - X\beta_i\|_2^2 + \lambda \|\beta_i\|_2^2 + \lambda_1 \|\beta_i\|_1,
+\]
+which is a regression problem with sparsity.
+
+\section{Intuition}
+
+\begin{itemize}
+    \item Dense loadings $v_i$ capture maximum variance in the score $Z_i$.
+    \item Sparse loadings $\beta_i$ approximate $Z_i$ using only a subset of features.
+    \item The objective trades off fit (small $\|Z_i - X\beta_i\|_2^2$) and sparsity (small $\|\beta_i\|_1$).
+\end{itemize}
+
+\noindent
+\textbf{Regression perspective:} Sparse PCA can be seen as regressing the dense score $Z_i$ on the original features $X$ to find sparse weights.
+
+\section{Summary Notes}
+
+\begin{itemize}
+    \item Sparse PCA approximates dense PCA components using sparse linear combinations of features.
+    \item The regression form connects Sparse PCA to LASSO / elastic net solvers.
+    \item The $\ell_1$ penalty induces sparsity; the $\ell_2$ penalty stabilizes the solution.
+    \item Each component $\beta_i$ can be solved via component-wise regression.
+\end{itemize}
+
+\section{Regression-type PCA}
+
+We start with a connection between PCA and regression. Suppose $X \in \mathbb{R}^{n \times p}$ is the data matrix, and we want to derive the first principal component using a \emph{regression-type formulation}.
+
+\subsection{Theorem 2: Leading Principal Component via Regression}
+\textbf{Theorem 2.} For any $\lambda > 0$, define
+\[
+(\hat{\alpha}, \hat{\beta}) = \arg \min_{\alpha, \beta} \sum_{i=1}^n \| x_i - \alpha \beta^\top x_i \|_2^2 + \lambda \|\beta\|_2^2
+\]
+subject to 
+\[
+\|\alpha\|_2 = 1.
+\]
+
+\textbf{Result:} $\hat{\beta} \propto V_1$, where $V_1$ is the first principal component of $X$.  
+
+\textbf{Interpretation:}
+\begin{itemize}
+    \item $\beta$ is the loading vector (shared across all rows), corresponding to the principal direction in feature space.
+    \item $\alpha$ is the scaling vector used to reconstruct $x_i$ from its projection $\beta^\top x_i$.
+    \item Each row of the reconstruction: $\hat{x}_i = \alpha (\beta^\top x_i)$, a rank-1 approximation of $x_i$.
+\end{itemize}
+
+\subsection{Theorem 3: Multiple Principal Components}
+
+Let us now consider the first $k$ principal components. Define
+\[
+A = [\alpha_1, \dots, \alpha_k] \in \mathbb{R}^{p \times k}, \quad
+B = [\beta_1, \dots, \beta_k] \in \mathbb{R}^{p \times k}.
+\]
+
+\textbf{Theorem 3.} For any $\lambda > 0$, define
+\[
+(A, B) = \arg \min_{A, B} \sum_{i=1}^n \| x_i - A B^\top x_i \|_2^2 + \lambda \sum_{j=1}^k \|\beta_j\|_2^2
+\]
+subject to
+\[
+A^\top A = I_{k \times k}.
+\]
+
+\textbf{Result:} $\hat{\beta}_j \propto V_j$ for $j = 1, \dots, k$, i.e., solving this regression-type criterion recovers all $k$ principal components simultaneously.
+
+\subsection{Matrix Form of the Objective}
+
+The row-wise sum of squared errors can be written compactly as a Frobenius norm:
+\[
+\sum_{i=1}^n \| x_i - A B^\top x_i \|_2^2 = \| X - X B A^\top \|_F^2
+\]
+
+\subsection{Decomposition using Orthogonal Complement}
+
+Let $A^\perp \in \mathbb{R}^{p \times (p-k)}$ be any orthonormal complement of $A$, so that $[A \quad A^\perp]$ is a $p \times p$ orthonormal matrix. Then we can decompose the error:
+\[
+\| X - X B A^\top \|_F^2 = \| X A^\perp \|_F^2 + \| X A - X B \|_F^2
+= \| X A^\perp \|_F^2 + \sum_{j=1}^k \| X \alpha_j - X \beta_j \|_2^2
+\]
+
+\textbf{Key points:}
+\begin{itemize}
+    \item $\|X A^\perp\|_F^2$ is the part of $X$ outside the column space of $A$ and cannot be reduced by $B$.
+    \item Once $A$ is fixed, minimizing over $B$ reduces to $k$ independent ridge regressions:
+    \[
+    \hat{\beta}_j = \arg \min_{\beta_j} \| X \alpha_j - X \beta_j \|_2^2 + \lambda \|\beta_j\|_2^2, \quad j=1,\dots,k.
+    \]
+\end{itemize}
+
+\subsection{SPCA: Introducing Sparsity via Lasso}
+
+To obtain sparse loadings, we add a Lasso penalty to the criterion:
+\[
+(A, B) = \arg \min_{A,B} \sum_{i=1}^n \| x_i - A B^\top x_i \|_2^2 + \lambda \sum_{j=1}^k \|\beta_j\|_2^2 + \sum_{j=1}^k \lambda_{1,j} \|\beta_j\|_1
+\]
+subject to $A^\top A = I_{k \times k}$.  
+
+\textbf{Notes:}
+\begin{itemize}
+    \item $\lambda$ stabilizes the solution and ensures exact PCA when $p>n$ and $\lambda_{1,j}=0$.
+    \item $\lambda_{1,j}$ controls sparsity for each principal component individually.
+    \item This criterion is called the \textbf{SPCA criterion}.
+\end{itemize}
+
+\section{Intuition Summary}
+
+\begin{itemize}
+    \item Classical PCA: dense loading vectors $V_j$, perfect reconstruction along principal directions.
+    \item Regression-type PCA: recast PCA as a \emph{regression problem}, $\beta_j$ as regression coefficients, $\alpha_j$ as scaling vectors.
+    \item Orthogonal decomposition: separates the reconstruction error into the part inside the column space of $A$ (optimizable) and the orthogonal part (irreducible).
+    \item SPCA: adding Lasso penalty produces sparse $\beta_j$ while approximating classical PCs.
+\end{itemize}
+
+\appendix
+
+\section{Additional Notes: Convex Relaxations and Online Sparse PCA}
+
+\subsection{Background and Motivation}
+
+Sparse Principal Component Analysis (Sparse PCA) seeks a low-dimensional principal
+subspace while enforcing sparsity in the loading vectors. Relative to classical
+PCA, sparsity improves interpretability and can improve statistical performance in
+high-dimensional settings where the leading eigenvectors are believed to be sparse.
+
+The difficulty is computational: the most direct formulations impose $\ell_0$
+constraints (or related combinatorial constraints) on the loadings, leading to
+nonconvex and generally NP-hard optimization problems. As a result, much of the
+literature studies convex relaxations and efficient iterative heuristics that trade
+statistical accuracy for computational tractability.
+
+\subsection{Baseline: Fantope Projection and Selection}
+
+One of the most prominent convex relaxations for Sparse PCA is the
+\emph{Fantope Projection and Selection} (FPS) method.
+Instead of directly estimating sparse eigenvectors, FPS optimizes over a matrix
+variable constrained to lie in the Fantope, defined as the convex hull of rank-$d$
+projection matrices.
+
+Although FPS enjoys strong statistical guarantees and convexity, it is
+computationally expensive. In particular, each iteration typically requires
+eigen-decomposition and projection onto the Fantope, which becomes prohibitively
+costly in high-dimensional settings. As a result, FPS is often impractical for
+large-scale or streaming data scenarios.
+
+\subsection{Limitations of Existing Online Sparse PCA Methods}
+
+While online PCA is well understood, extending Sparse PCA to the online setting
+poses significant challenges. Existing online Sparse PCA methods are often based on
+heuristics or nonconvex updates, and typically lack either statistical guarantees,
+computational efficiency, or both.
+
+In fact, designing an online Sparse PCA algorithm that is simultaneously
+\begin{itemize}
+    \item statistically consistent,
+    \item computationally efficient,
+    \item globally convergent,
+\end{itemize}
+under a general covariance model remains an open problem in the literature.
+
+\subsection{Quick Review: PCA and Sparse PCA}
+
+Given centered data $X \in \mathbb{R}^{n \times p}$, the sample covariance is
+\[
+\Sigma = \frac{1}{n} X^\top X.
+\]
+
+\paragraph{Variance maximization view}
+Single-component PCA can be formulated as
+\[
+\max_{v \in \mathbb{R}^p} \; v^\top \Sigma v \quad \text{s.t. } \|v\|_2 = 1.
+\]
+
+\paragraph{Regression view}
+PCA can also be written as
+\[
+\min_{Z,V} \; \|X - ZV^\top\|_F^2 \quad \text{s.t. } V^\top V = I_d.
+\]
+
+\subsection{Projection Matrix Formulation and Convex Relaxation}
+
+For a unit vector $v$, define the rank-1 projector $P := vv^\top$. Then
+$v^\top \Sigma v = \mathrm{tr}(\Sigma P)$.
+Writing PCA in terms of $P$ makes the objective linear, while the constraints
+(rank/idempotence) are nonconvex.
+
+Relaxing $P^2=P$ and $\mathrm{rank}(P)=d$ to $0 \preceq P \preceq I$ while keeping
+$\mathrm{tr}(P)=d$ yields the Fantope, i.e., the convex hull of rank-$d$ projectors.
+
+\end{document}

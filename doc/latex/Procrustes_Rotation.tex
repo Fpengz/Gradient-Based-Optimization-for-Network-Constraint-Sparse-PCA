@@ -1,0 +1,273 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{graphicx}
+
+\title{Procrustes Rotation: Theory, Derivation, and Intuition}
+\author{}
+\date{}
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\section{Introduction}
+\label{sec:introduction}
+
+The \textbf{Procrustes rotation} problem, named after the mythological Greek figure who forced travelers to fit his bed by stretching or amputating them, is a fundamental problem in multidimensional alignment. Given two configurations of points in $\mathbb{R}^p$, we seek an orthogonal transformation (rotation, possibly with reflection) that best aligns one configuration with another. This problem arises in numerous fields including factor analysis, shape statistics, computer vision, and molecular biology.
+
+\section{Problem Formulation}
+\label{sec:formulation}
+
+\begin{definition}[Orthogonal Procrustes Problem]
+Let $X, Y \in \mathbb{R}^{n \times p}$ be two matrices representing $n$ points in $p$-dimensional space (typically after centering). We seek an orthogonal matrix $R \in \mathbb{R}^{p \times p}$ (i.e., $R^\top R = I_p$) that minimizes the Frobenius norm:
+\[
+\|XR - Y\|_F^2 = \operatorname{tr}\left[(XR - Y)^\top (XR - Y)\right]
+\]
+Optionally, we may also include an isotropic scaling factor $s > 0$, in which case we minimize $\|sXR - Y\|_F^2$.
+\end{definition}
+
+\subsection{Assumptions and Preprocessing}
+\label{subsec:preprocessing}
+
+\begin{enumerate}
+    \item \textbf{Centering}: Typically, we assume $X$ and $Y$ are column-centered, i.e., $\mathbf{1}_n^\top X = \mathbf{1}_n^\top Y = \mathbf{0}$. This eliminates translation effects.
+    \item \textbf{Reflection}: The basic problem allows $R$ with $\det(R) = \pm 1$. Some applications restrict to pure rotations ($\det(R) = +1$).
+    \item \textbf{Scaling}: The isotropic scaling version is often denoted the ``Procrustes with scaling'' problem.
+\end{enumerate}
+
+\section{Derivation of the Solution}
+\label{sec:derivation}
+
+\subsection{Without Scaling}
+\label{subsec:without-scaling}
+
+We begin with the orthogonal Procrustes problem without scaling:
+
+\begin{theorem}[Orthogonal Procrustes Solution]
+Let $X, Y \in \mathbb{R}^{n \times p}$ with $X^\top X$ and $Y^\top Y$ finite. Let $M = X^\top Y$ and consider its singular value decomposition (SVD) $M = U\Sigma V^\top$, where $U^\top U = V^\top V = I_p$ and $\Sigma = \operatorname{diag}(\sigma_1, \dots, \sigma_p)$ with $\sigma_1 \geq \dots \geq \sigma_p \geq 0$. Then the orthogonal matrix $R$ minimizing $\|XR - Y\|_F^2$ is given by:
+\[
+R_{\text{opt}} = U V^\top
+\]
+\end{theorem}
+
+\begin{proof}
+We expand the objective function:
+\begin{align*}
+\|XR - Y\|_F^2 &= \operatorname{tr}\left[(XR - Y)^\top (XR - Y)\right] \\
+&= \operatorname{tr}(R^\top X^\top X R) - \operatorname{tr}(R^\top X^\top Y) - \operatorname{tr}(Y^\top X R) + \operatorname{tr}(Y^\top Y) \\
+&= \operatorname{tr}(X^\top X) - 2\operatorname{tr}(R^\top X^\top Y) + \operatorname{tr}(Y^\top Y)
+\end{align*}
+where we used the cyclic property of trace and $R^\top R = I$. Since $\operatorname{tr}(X^\top X)$ and $\operatorname{tr}(Y^\top Y)$ are constant, minimizing $\|XR - Y\|_F^2$ is equivalent to maximizing:
+\[
+\operatorname{tr}(R^\top X^\top Y) = \operatorname{tr}(R^\top M)
+\]
+
+Let $M = U\Sigma V^\top$ be the SVD of $M$. Define $Z = V^\top R^\top U$. Since $U, R, V$ are orthogonal, $Z$ is also orthogonal ($Z^\top Z = I$). Then:
+\[
+\operatorname{tr}(R^\top M) = \operatorname{tr}(R^\top U\Sigma V^\top) = \operatorname{tr}(V^\top R^\top U \Sigma) = \operatorname{tr}(Z\Sigma) = \sum_{i=1}^p Z_{ii} \sigma_i
+\]
+
+For an orthogonal matrix $Z$, we have $|Z_{ii}| \leq 1$ for all $i$ (since columns are unit vectors). The sum $\sum_{i=1}^p Z_{ii} \sigma_i$ is maximized when $Z_{ii} = 1$ for all $i$, i.e., when $Z = I$. This gives:
+\[
+Z = I \Rightarrow V^\top R^\top U = I \Rightarrow R^\top = V U^\top \Rightarrow R = U V^\top
+\]
+\end{proof}
+
+\subsection{With Isotropic Scaling}
+\label{subsec:with-scaling}
+
+\begin{theorem}[Procrustes with Scaling]
+The solution to $\min_{s>0, R^\top R=I} \|sXR - Y\|_F^2$ is:
+\[
+R_{\text{opt}} = U V^\top, \quad s_{\text{opt}} = \frac{\operatorname{tr}(\Sigma)}{\|X\|_F^2}
+\]
+where $M = X^\top Y = U\Sigma V^\top$ as before.
+\end{theorem}
+
+\begin{proof}
+Expanding the objective with scaling:
+\[
+\|sXR - Y\|_F^2 = s^2 \operatorname{tr}(X^\top X) - 2s \operatorname{tr}(R^\top X^\top Y) + \operatorname{tr}(Y^\top Y)
+\]
+For fixed $R$, this is quadratic in $s$. Taking derivative:
+\[
+\frac{\partial}{\partial s} = 2s \operatorname{tr}(X^\top X) - 2\operatorname{tr}(R^\top X^\top Y) = 0
+\]
+gives the optimal scaling for given $R$:
+\[
+s(R) = \frac{\operatorname{tr}(R^\top X^\top Y)}{\operatorname{tr}(X^\top X)}
+\]
+provided $\operatorname{tr}(X^\top X) > 0$.
+
+Substituting back, we minimize:
+\[
+-\frac{[\operatorname{tr}(R^\top X^\top Y)]^2}{\operatorname{tr}(X^\top X)} + \operatorname{tr}(Y^\top Y)
+\]
+which is equivalent to maximizing $|\operatorname{tr}(R^\top X^\top Y)|$ over $R$. Since $s > 0$, we want $\operatorname{tr}(R^\top X^\top Y)$ positive and maximized.
+
+From the previous proof, the maximum is achieved at $R = U V^\top$, giving:
+\[
+\operatorname{tr}(R_{\text{opt}}^\top X^\top Y) = \operatorname{tr}(V U^\top U\Sigma V^\top) = \operatorname{tr}(V\Sigma V^\top) = \operatorname{tr}(\Sigma)
+\]
+Thus:
+\[
+s_{\text{opt}} = \frac{\operatorname{tr}(\Sigma)}{\operatorname{tr}(X^\top X)} = \frac{\operatorname{tr}(\Sigma)}{\|X\|_F^2}
+\]
+\end{proof}
+
+\subsection{Refinement for Pure Rotations}
+\label{subsec:pure-rotations}
+
+If we require $\det(R) = +1$ (pure rotation without reflection), the solution becomes:
+\[
+R_{\text{opt}} = U D V^\top
+\]
+where $D = \operatorname{diag}(1, 1, \dots, 1, \det(U V^\top))$. This ensures $\det(R) = +1$ while changing only the sign associated with the smallest singular value.
+
+\section{Geometric Intuition}
+\label{sec:intuition}
+
+\subsection{The Core Insight: Aligning Natural Axes}
+\label{subsec:core-insight}
+
+The SVD solution reveals a profound geometric insight: the optimal rotation aligns the \textit{principal correlation directions} between $X$ and $Y$.
+
+\begin{itemize}
+    \item $U$: Orthonormal basis for the row space of $M = X^\top Y$ in $X$-coordinates
+    \item $V$: Orthonormal basis for the column space of $M$ in $Y$-coordinates
+    \item $\Sigma$: Strengths of correlation between corresponding $U_i$ and $V_i$ directions
+\end{itemize}
+
+The rotation $R = U V^\top$ maps each $V_i$ to $U_i$: $R V_i = U_i$. This ensures that directions with strong correlation between $X$ and $Y$ become aligned.
+
+\subsection{Visual Analogy: Constellation Matching}
+\label{subsec:analogy}
+
+Imagine two photographs of the same star constellation taken from different orientations:
+\begin{enumerate}
+    \item \textbf{SVD step}: Identifies which star patterns (directions) in photo $A$ correspond to which patterns in photo $B$
+    \item $U$, $V$: Principal axes of each constellation's internal geometry
+    \item $\sigma_i$: How well corresponding patterns match
+    \item $R = U V^\top$: The rotation needed to make photo $A$'s axes align with photo $B$'s axes
+\end{enumerate}
+
+\subsection{Trace Maximization Interpretation}
+\label{subsec:trace-interpretation}
+
+The key step $\max_R \operatorname{tr}(R^\top M)$ has an intuitive interpretation:
+\begin{itemize}
+    \item Each entry $M_{ij} = x_i^\top y_j$ measures alignment between the $i$th column of $X$ and $j$th column of $Y$
+    \item $R_{ji}$ determines how much we ``mix'' $x_i$ into the $j$th direction of the rotated $X$
+    \item $\operatorname{tr}(R^\top M) = \sum_{i,j} R_{ji} M_{ij}$ is thus a total ``alignment score''
+    \item The SVD solution finds the optimal mixing that maximizes this score
+\end{itemize}
+
+\subsection{Why $Z = I$ is Optimal}
+\label{subsec:why-z-i}
+
+In the proof, we defined $Z = V^\top R^\top U$ and needed to maximize $\operatorname{tr}(Z\Sigma) = \sum_i Z_{ii} \sigma_i$:
+\begin{itemize}
+    \item Since $Z$ is orthogonal, $|Z_{ii}| \leq 1$ (diagonal entries are cosines of angles)
+    \item With $\sigma_i$ non-negative and typically ordered, the sum is maximized when each $Z_{ii}$ takes its maximum possible value: $Z_{ii} = 1$
+    \item This forces $Z = I$ (since an orthogonal matrix with all diagonal entries 1 must be the identity)
+\end{itemize}
+
+\subsection{Scaling Intuition}
+\label{subsec:scaling-intuition}
+
+The optimal scaling factor $s_{\text{opt}} = \frac{\operatorname{tr}(\Sigma)}{\|X\|_F^2}$ has a clear meaning:
+\[
+s_{\text{opt}} = \frac{\text{``Total correlation strength'' between aligned directions}}{\text{``Total size'' of $X$}}
+\]
+If $X$ and $Y$ are already similarly scaled, $s_{\text{opt}} \approx 1$.
+
+\subsection{Reflection vs. Rotation}
+\label{subsec:reflection-intuition}
+
+\begin{itemize}
+    \item $R = U V^\top$ might have $\det(R) = -1$, indicating a reflection
+    \item Geometrically: Sometimes flipping one shape yields better alignment than pure rotation
+    \item In shape analysis: Reflection preserves shape (a mirrored triangle is congruent)
+    \item In factor analysis: Reflection may change interpretation of latent factors
+\end{itemize}
+
+\section{Applications}
+\label{sec:applications}
+
+\subsection{Factor Analysis and Psychometrics}
+\label{subsec:factor-analysis}
+Target rotation in factor analysis: rotating a factor solution toward a hypothesized structure.
+
+\subsection{Shape Analysis}
+\label{subsec:shape-analysis}
+Generalized Procrustes Analysis (GPA) for removing non-shape variation (position, orientation, scale) in morphometrics.
+
+\subsection{Molecular Biology}
+\label{subsec:molecular-bio}
+Structural alignment of proteins: minimizing RMSD between atomic coordinates.
+
+\subsection{Computer Vision}
+\label{subsec:computer-vision}
+Point set registration, object recognition, and 3D reconstruction.
+
+\section{Implementation Notes}
+\label{sec:implementation}
+
+\subsection{Numerical Computation}
+\label{subsec:numerical}
+
+\begin{verbatim}
+def procrustes(X, Y, scaling=True, reflection=True):
+    # Center the data
+    X_centered = X - np.mean(X, axis=0)
+    Y_centered = Y - np.mean(Y, axis=0)
+    
+    # Compute M = X^T Y
+    M = X_centered.T @ Y_centered
+    
+    # SVD
+    U, Sigma, Vt = np.linalg.svd(M, full_matrices=True)
+    V = Vt.T
+    
+    # Determine rotation
+    if reflection:
+        R = U @ V.T
+    else:
+        # Ensure det(R) = +1
+        d = np.eye(U.shape[1])
+        d[-1, -1] = np.linalg.det(U @ V.T)
+        R = U @ d @ V.T
+    
+    # Scaling
+    if scaling:
+        s = np.trace(np.diag(Sigma)) / np.trace(X_centered.T @ X_centered)
+    else:
+        s = 1.0
+    
+    return s, R
+\end{verbatim}
+
+\subsection{Practical Considerations}
+\label{subsec:practical}
+
+\begin{enumerate}
+    \item \textbf{Rank deficiency}: When $\operatorname{rank}(M) < p$, use economy SVD
+    \item \textbf{Noise robustness}: Larger singular values are more reliable for alignment
+    \item \textbf{Computational complexity}: $O(np^2 + p^3)$ for SVD
+\end{enumerate}
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+The Procrustes rotation problem exemplifies how a seemingly complex alignment problem admits an elegant closed-form solution via SVD. The intuition—aligning principal correlation directions—explains both why the solution works and why it's optimal. This combination of mathematical rigor and geometric insight makes Procrustes rotation a powerful tool across diverse scientific domains.
+
+\end{document}

@@ -1,0 +1,187 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{booktabs}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+
+\title{The Power Method: Intuition, Formulation, and Connections}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section*{Introduction: The Power of Multiplication}
+
+Power methods are based on a remarkably simple yet profound insight: repeatedly applying a linear transformation tends to amplify the component in the direction of the transformation's most expansive (or contractive) direction. Consider a matrix $A \in \mathbb{C}^{n \times n}$ representing some linear transformation. If we start with a vector $b_0$ and repeatedly apply $A$, the sequence
+\[
+b_k = A^k b_0
+\]
+reveals the \emph{dominant} behavior of $A$ as $k \to \infty$.
+
+\section{Basic Power Iteration: The Core Intuition}
+
+\subsection{Formulation}
+Given a diagonalizable matrix $A$ with eigenvalues $|\lambda_1| > |\lambda_2| \geq \cdots \geq |\lambda_n|$ and corresponding eigenvectors $v_1, \dots, v_n$, any initial vector can be expressed as:
+\[
+b_0 = \sum_{i=1}^n c_i v_i, \quad c_i \in \mathbb{C}
+\]
+Applying $A$ repeatedly gives:
+\[
+A^k b_0 = \sum_{i=1}^n c_i \lambda_i^k v_i 
+      = \lambda_1^k \left( c_1 v_1 + \sum_{i=2}^n c_i \left(\frac{\lambda_i}{\lambda_1}\right)^k v_i \right)
+\]
+Since $|\lambda_i/\lambda_1| < 1$ for $i \geq 2$, as $k \to \infty$:
+\[
+A^k b_0 \approx \lambda_1^k c_1 v_1
+\]
+The direction of $A^k b_0$ aligns with $v_1$, while its magnitude grows as $|\lambda_1|^k$.
+
+\subsection{Normalized Algorithm}
+To prevent overflow/underflow and extract the eigenvalue:
+\begin{align*}
+& \text{Choose random } b_0 \text{ with } \|b_0\| = 1 \\
+& \text{For } k = 0, 1, 2, \dots: \\
+& \quad y_{k+1} = A b_k \\
+& \quad b_{k+1} = \frac{y_{k+1}}{\|y_{k+1}\|} \\
+& \quad \lambda^{(k+1)} = b_k^* A b_k \quad \text{(Rayleigh quotient)}
+\end{align*}
+The Rayleigh quotient gives the best eigenvalue approximation given the current eigenvector estimate.
+
+\subsection{Geometric Interpretation}
+Imagine $A$ as a transformation that stretches space differently in various directions. Starting with a random vector, each application of $A$ stretches it more in the direction of greatest expansion. Normalization keeps us on the unit sphere while we gradually \emph{slide toward} the dominant eigenvector.
+
+\section{Variants and Their Intuitions}
+
+\subsection{Inverse Iteration: Flipping the Spectrum}
+If $A$ is invertible with eigenvalues $\lambda_i$, then $A^{-1}$ has eigenvalues $1/\lambda_i$. Thus:
+\[
+\text{largest } |\lambda_i| \text{ for } A \ \Rightarrow\ \text{smallest } |1/\lambda_i| \text{ for } A^{-1}
+\]
+Applying power iteration to $A^{-1}$ finds the \emph{smallest} eigenvalue of $A$:
+\[
+A b_{k+1} = b_k \quad \text{(solve linear system)}
+\]
+This requires solving a linear system at each iteration, but often with the same factorization reused.
+
+\subsection{Shifted Inverse Iteration: Targeting Specific Eigenvalues}
+The key insight: eigenvalues of $(A - \sigma I)^{-1}$ are $1/(\lambda_i - \sigma)$. The largest one corresponds to the $\lambda_i$ \emph{closest to $\sigma$}. This gives us a \emph{homing mechanism}:
+\[
+(A - \sigma I) b_{k+1} = b_k
+\]
+By choosing $\sigma$ near a desired eigenvalue, we get rapid convergence to that eigenpair.
+
+\subsection{Rayleigh Quotient Iteration: Adaptive Homing}
+An elegant synthesis: use the current Rayleigh quotient $\rho_k = b_k^* A b_k$ as the shift:
+\[
+(A - \rho_k I) b_{k+1} = b_k
+\]
+\begin{itemize}
+\item \textbf{Intuition}: As $b_k$ approaches an eigenvector, $\rho_k$ approaches the corresponding eigenvalue
+\item The shift becomes increasingly accurate, accelerating convergence
+\item Achieves \emph{cubic convergence} near eigenvectors
+\end{itemize}
+
+\section{Connections to Other Methods}
+
+\subsection{Link to Krylov Subspace Methods}
+Power iteration builds the Krylov subspace:
+\[
+\mathcal{K}_k(A, b_0) = \text{span}\{b_0, A b_0, A^2 b_0, \dots, A^{k-1} b_0\}
+\]
+This is the foundation for:
+\begin{itemize}
+\item \textbf{Arnoldi iteration}: Orthogonalizes the Krylov basis for general matrices
+\item \textbf{Lanczos method}: Specialized Arnoldi for Hermitian matrices (tridiagonal reduction)
+\item These methods extract \emph{multiple} eigenvalues from the subspace, not just the dominant one
+\end{itemize}
+
+\subsection{Relationship to QR Algorithm}
+The QR algorithm for dense matrices can be viewed as \emph{subspace iteration with Rayleigh-Ritz refinement}:
+\begin{itemize}
+\item Simultaneous iteration on all basis vectors
+\item Repeated QR decompositions provide orthogonalization
+\item Ultimately converges to Schur form
+\end{itemize}
+Power iteration is essentially the single-vector case of subspace iteration.
+
+\subsection{Connection to Markov Chains and PageRank}
+For a column-stochastic matrix $P$ (Markov transition matrix):
+\begin{itemize}
+\item Dominant eigenvalue is 1 (Perron-Frobenius theorem)
+\item Corresponding eigenvector is the stationary distribution
+\item Power iteration: $x_{k+1} = P x_k$ converges to PageRank vector
+\item Normalization is automatic since $P$ preserves sum of components
+\end{itemize}
+
+\section{Geometric Perspective: Why It Works}
+
+\subsection{Contraction Mapping Viewpoint}
+Consider the iteration on the unit sphere $\mathbb{S}^{n-1}$:
+\[
+f(x) = \frac{Ax}{\|Ax\|}
+\]
+Under mild conditions, $f$ is a contraction on regions of the sphere, with fixed points at the eigenvectors. The contraction factor is approximately $|\lambda_2/\lambda_1|$.
+
+\subsection{Optimization Interpretation}
+For Hermitian $A$, the Rayleigh quotient
+\[
+R(x) = \frac{x^* A x}{x^* x}
+\]
+has gradient proportional to $Ax - R(x)x$. Power iteration with normalization is essentially gradient ascent on $R(x)$ constrained to $\|x\|=1$.
+
+\subsection{Spectral Decomposition Lens}
+Write $A = V\Lambda V^{-1}$. Then:
+\[
+A^k = V\Lambda^k V^{-1} = \sum_{i=1}^n \lambda_i^k v_i w_i^*
+\]
+where $w_i$ are rows of $V^{-1}$. The dominance of $\lambda_1^k$ makes all other terms negligible.
+
+\section{Extension to Multiple Eigenvectors}
+
+\subsection{Orthogonal Iteration}
+To find $p$ dominant eigenvectors:
+\begin{align*}
+& Z_0 \in \mathbb{C}^{n \times p} \text{ with orthonormal columns} \\
+& \text{For } k = 0, 1, 2, \dots: \\
+& \quad X_{k+1} = A Z_k \\
+& \quad Z_{k+1} = \text{orthonormalize}(X_{k+1}) \quad \text{(QR factorization)}
+\end{align*}
+The columns of $Z_k$ converge to the first $p$ eigenvectors (Schur vectors).
+
+\subsection{Intuition for Orthogonal Iteration}
+\begin{itemize}
+\item Each column undergoes power iteration
+\item Orthogonalization prevents all columns from converging to $v_1$
+\item The subspace $\text{span}(Z_k)$ converges to the dominant $p$-dimensional invariant subspace
+\item This is essentially block power iteration
+\end{itemize}
+
+\section{Practical Considerations and Modern Context}
+
+\subsection{Convergence Rates}
+\begin{itemize}
+\item Basic power iteration: linear convergence with rate $|\lambda_2/\lambda_1|$
+\item Rayleigh quotient iteration: cubic convergence near eigenvectors
+\item Convergence slows when $|\lambda_2/\lambda_1| \approx 1$ (clustered eigenvalues)
+\end{itemize}
+
+\subsection{Modern Implementations}
+\begin{itemize}
+\item \textbf{Implicit restarting}: Combines Arnoldi/Lanczos with polynomial filtering to focus on wanted eigenvalues
+\item \textbf{Chebyshev acceleration}: Uses polynomial transformations to enhance separation of wanted/unwanted eigenvalues
+\item \textbf{Preconditioned variants}: For generalized eigenvalue problems
+\end{itemize}
+
+\section*{Conclusion: The Enduring Power of a Simple Idea}
+
+The power method embodies a fundamental principle in numerical analysis: \emph{repeated application reveals structure}. Its simplicity makes it both pedagogically illuminating and practically useful for large-scale problems where full decompositions are infeasible. While modern variants like Arnoldi and Jacobi-Davidson are more sophisticated, they retain the core insight: iterative refinement of approximate invariant subspaces through repeated matrix-vector products.
+
+\begin{thebibliography}{9}
+\bibitem{golub} Golub, G. H., \& Van Loan, C. F. (2013). \emph{Matrix Computations}. Johns Hopkins University Press.
+\bibitem{trefethen} Trefethen, L. N., \& Bau, D. (1997). \emph{Numerical Linear Algebra}. SIAM.
+\bibitem{parlett} Parlett, B. N. (1998). \emph{The Symmetric Eigenvalue Problem}. SIAM.
+\end{thebibliography}
+
+\end{document}

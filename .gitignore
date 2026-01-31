@@ -1,0 +1,25 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.mypy_cache/
+notebooks/.ipynb_checkpoints/
+
+# Virtual environments
+.venv
+
+# IDE files
+.vscode/
+.idea/
+
+# LaTeX compiled files
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.pdf
+*.fls
+*.fdb_latexmk

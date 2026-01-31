@@ -1,0 +1,28 @@
+[project]
+name = "nc-spca"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "black>=26.1.0",
+    "ipykernel>=7.1.0",
+    "jupyter>=1.1.1",
+    "matplotlib>=3.10.8",
+    "numpy>=2.2.6",
+    "pyrefly>=0.50.0",
+    "pytest>=9.0.2",
+    "ruff>=0.14.14",
+    "scikit-learn>=1.7.2",
+    "ty>=0.0.14",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

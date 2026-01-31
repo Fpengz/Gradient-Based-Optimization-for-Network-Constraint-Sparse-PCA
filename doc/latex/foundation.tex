@@ -1,0 +1,477 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\geometry{margin=1in}
+
+\title{Math Foundation Notes}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Graph Laplacian and Network Smoothness}
+
+\subsection{Graph-Structured Data and Graph Signals}
+Let \(G=(V,E)\) be an undirected weighted graph with node set \(V=\{1,\dots,n\}\) and edge set \(E\subseteq V\times V\).
+We represent the connectivity of the graph by a symmetric nonnegative weight matrix
+\[
+W = (w_{ij})_{i,j=1}^n,\qquad w_{ij}\ge 0,\qquad w_{ij}=w_{ji},
+\]
+where \(w_{ij}>0\) indicates an edge between nodes \(i\) and \(j\), and larger values of \(w_{ij}\) correspond to stronger affinity.
+
+A \emph{graph signal} is a function \(f:V\to \mathbb{R}\), which can be identified with a vector
+\[
+f = (f_1,\dots,f_n)^\top \in \mathbb{R}^n,
+\]
+where \(f_i\) denotes the value of the signal at node \(i\). Typical examples include opinion scores on a social network, temperature readings in a sensor network, or latent features attached to data points.
+
+\subsection{Network Smoothness}
+A central modeling assumption in graph-based learning is that neighboring nodes tend to have similar signal values. This intuition is formalized through a smoothness functional that penalizes large variations across edges:
+\[
+\mathcal{S}(f)
+\;=\;
+\frac{1}{2}\sum_{i=1}^n\sum_{j=1}^n w_{ij}\,(f_i-f_j)^2.
+\]
+The factor \(\tfrac{1}{2}\) avoids double counting in undirected graphs.
+Under this definition, a signal is considered \emph{smooth on the network} when \(\mathcal{S}(f)\) is small, meaning that the values \(f_i\) and \(f_j\) are close whenever the edge weight \(w_{ij}\) is large.
+
+\subsection{The Graph Laplacian}
+Define the (weighted) degree of node \(i\) by
+\[
+d_i = \sum_{j=1}^n w_{ij},
+\]
+and let \(D\in\mathbb{R}^{n\times n}\) be the diagonal degree matrix \(D=\mathrm{diag}(d_1,\dots,d_n)\).
+The (combinatorial) graph Laplacian is then defined as
+\[
+L = D - W.
+\]
+The Laplacian is symmetric and positive semidefinite when \(W\) is symmetric and nonnegative.
+
+\subsection{Smoothness as a Laplacian Quadratic Form}
+The network smoothness functional admits an equivalent and compact matrix expression in terms of the Laplacian:
+\[
+f^\top L f
+\;=\;
+\frac{1}{2}\sum_{i=1}^n\sum_{j=1}^n w_{ij}\,(f_i-f_j)^2.
+\]
+Thus, the quadratic form \(f^\top L f\) measures the total variation of the signal \(f\) over the graph: it becomes large when strongly connected nodes have substantially different values, and small when the signal varies slowly across edges.
+
+In particular, if \(f\) is constant on all nodes, then \(f^\top L f = 0\). More generally, \(f^\top L f\) is small when the graph signal is approximately constant within regions of strong connectivity.
+
+\subsection{Local Interpretation of the Laplacian Operator}
+The action of the Laplacian on a graph signal can be interpreted locally. For each node \(i\),
+\[
+(Lf)_i
+\;=\;
+\sum_{j=1}^n w_{ij}(f_i-f_j).
+\]
+This quantity measures how much the value at node \(i\) deviates from its neighbors, weighted by edge strengths.
+If \(f_i\) is close to the weighted average of its neighbors, then \((Lf)_i\) is small, indicating local smoothness at node \(i\).
+Conversely, if \(f_i\) differs significantly from neighboring values, then \((Lf)_i\) becomes large, reflecting local irregularity.
+
+This viewpoint is analogous to the classical Laplace operator in continuous domains, where the Laplacian measures deviation from local averaging and governs diffusion phenomena.
+
+\subsection{Practical Relevance}
+The Laplacian-based smoothness penalty plays a fundamental role in many graph-based methods. For example:
+\begin{itemize}
+    \item \textbf{Graph regularization and semi-supervised learning:} one may enforce label or feature smoothness by minimizing \(f^\top L f\) subject to constraints from observed data.
+    \item \textbf{Spectral methods:} the eigenvectors of \(L\) provide a notion of frequency on graphs, where small eigenvalues correspond to smooth, low-frequency components.
+    \item \textbf{Clustering and partitioning:} Laplacian structure underlies spectral clustering, which seeks partitions that preserve strong within-cluster connectivity.
+\end{itemize}
+
+\subsection{Summary}
+In summary, network smoothness formalizes the principle that adjacent nodes should take similar values. The graph Laplacian \(L=D-W\) provides a natural operator for quantifying this property: the quadratic form \(f^\top L f\) equals the weighted sum of squared differences across edges, thereby measuring the roughness of a graph signal.
+
+\section{Hard and Soft Thresholding}
+
+Thresholding operators are widely used in signal processing, statistics, and sparse modeling to promote sparsity by removing or shrinking small-magnitude coefficients. Given a coefficient vector $x \in \mathbb{R}^d$ and a threshold parameter $\lambda \ge 0$, hard and soft thresholding define two common ways of mapping $x$ to a sparse vector.
+
+\subsection{Hard Thresholding}
+
+The \emph{hard thresholding} operator sets coefficients with magnitude below a threshold to zero, while leaving the remaining coefficients unchanged. Component-wise, it is defined as
+\[
+\bigl(H_\lambda(x)\bigr)_i
+=
+\begin{cases}
+x_i, & \text{if } |x_i| > \lambda,\\
+0, & \text{if } |x_i| \le \lambda,
+\end{cases}
+\qquad i=1,\dots,d.
+\]
+Hard thresholding preserves the values of sufficiently large coefficients exactly, and removes small coefficients entirely. However, since the mapping is discontinuous at $|x_i|=\lambda$, it can be sensitive to small perturbations near the threshold.
+
+\subsection{Soft Thresholding}
+
+The \emph{soft thresholding} operator shrinks coefficients toward zero by an amount $\lambda$ and sets coefficients with magnitude below the threshold to zero. Component-wise, it is defined as
+\[
+\bigl(S_\lambda(x)\bigr)_i
+=
+\begin{cases}
+\mathrm{sign}(x_i)\bigl(|x_i|-\lambda\bigr), & \text{if } |x_i| > \lambda,\\
+0, & \text{if } |x_i| \le \lambda,
+\end{cases}
+\qquad i=1,\dots,d,
+\]
+where $\mathrm{sign}(\cdot)$ denotes the sign function. Soft thresholding is continuous and yields smoother behavior than hard thresholding. It is closely associated with $\ell_1$-regularization methods such as the LASSO and is commonly used in wavelet denoising and sparse estimation procedures.
+
+\subsection{Comparison}
+
+Both operators promote sparsity by eliminating small coefficients, but they differ in how they treat coefficients above the threshold. Hard thresholding retains large coefficients unchanged, whereas soft thresholding additionally shrinks their magnitudes. As a result, soft thresholding is typically more stable numerically due to its continuity, while hard thresholding can be more aggressive in preserving large coefficients exactly.
+
+\section{Proximal Gradient Methods, Proximal Operators, and Worked Examples}
+
+\section{Composite Convex Optimization Setup}
+
+We consider optimization problems of the composite form
+\begin{equation}
+\min_{x \in \mathbb{R}^n} F(x) \;=\; f(x) + g(x),
+\end{equation}
+where:
+\begin{itemize}
+  \item $f:\mathbb{R}^n \to \mathbb{R}$ is convex and differentiable with Lipschitz continuous gradient (i.e., $\nabla f$ is $L$-Lipschitz),
+  \item $g:\mathbb{R}^n \to \mathbb{R}\cup\{+\infty\}$ is convex and possibly nonsmooth, but structured in a way that allows efficient computation of its proximal mapping.
+\end{itemize}
+
+\section{The Proximal Operator}
+
+\subsection{Definition}
+
+For $\alpha>0$, the proximal operator of $g$ at a point $v \in \mathbb{R}^n$ is defined by
+\begin{equation}
+\mathrm{prox}_{\alpha g}(v)
+\;=\;
+\arg\min_{x \in \mathbb{R}^n}
+\left\{
+g(x) + \frac{1}{2\alpha}\|x - v\|_2^2
+\right\}.
+\end{equation}
+
+The quadratic term ensures strong convexity of the subproblem and hence guarantees existence and uniqueness of the minimizer.
+
+\subsection{Why Nonsmoothness is Not an Obstacle}
+
+Even if $g$ is nonsmooth, the proximal subproblem remains well-defined since
+\begin{equation}
+x \mapsto g(x) + \frac{1}{2\alpha}\|x-v\|_2^2
+\end{equation}
+is convex and strongly convex. The proximal operator therefore provides a principled mechanism for incorporating nonsmooth regularization or constraints without explicitly differentiating $g$.
+
+\section{Proximal Gradient Descent}
+
+\subsection{Algorithmic Update}
+
+The proximal gradient method produces iterates $\{x^k\}_{k\ge 0}$ via
+\begin{equation}
+x^{k+1}
+=
+\mathrm{prox}_{\alpha g}\Bigl(x^k - \alpha \nabla f(x^k)\Bigr),
+\end{equation}
+where $\alpha>0$ is a step size.
+
+Equivalently, defining
+\begin{equation}
+y^k = x^k - \alpha \nabla f(x^k),
+\end{equation}
+the update becomes
+\begin{equation}
+x^{k+1} = \mathrm{prox}_{\alpha g}(y^k).
+\end{equation}
+
+\subsection{Quadratic Upper Model Interpretation}
+
+Using Lipschitz continuity of $\nabla f$, one has the standard inequality
+\begin{equation}
+f(x) \le f(x^k) + \langle \nabla f(x^k), x-x^k\rangle + \frac{L}{2}\|x-x^k\|_2^2.
+\end{equation}
+Proximal gradient descent can be viewed as minimizing the surrogate objective
+\begin{equation}
+x^{k+1}
+=
+\arg\min_x
+\left\{
+f(x^k) + \langle \nabla f(x^k), x-x^k\rangle
++ \frac{1}{2\alpha}\|x-x^k\|_2^2
++ g(x)
+\right\},
+\end{equation}
+which yields the proximal update when $\alpha \le 1/L$.
+
+\section{Worked Proximal Operator Examples}
+
+\subsection{Worked Example 1: \texorpdfstring{$\ell_1$}{l1} Regularization (Soft-Thresholding)}
+
+Let
+\begin{equation}
+g(x) = \lambda \|x\|_1 = \lambda \sum_{i=1}^n |x_i|,
+\quad \lambda>0.
+\end{equation}
+The proximal operator is defined by
+\begin{equation}
+\mathrm{prox}_{\alpha \lambda\|\cdot\|_1}(v)
+=
+\arg\min_{x\in\mathbb{R}^n}
+\left\{
+\lambda\|x\|_1 + \frac{1}{2\alpha}\|x-v\|_2^2
+\right\}.
+\end{equation}
+Since both terms are separable across coordinates, this optimization decomposes into $n$ independent one-dimensional problems:
+\begin{equation}
+\left(\mathrm{prox}_{\alpha \lambda\|\cdot\|_1}(v)\right)_i
+=
+\arg\min_{x_i\in\mathbb{R}}
+\left\{
+\lambda|x_i| + \frac{1}{2\alpha}(x_i-v_i)^2
+\right\}.
+\end{equation}
+
+Fix a coordinate and denote it by $x$ and $v$ for simplicity. Consider
+\begin{equation}
+\min_{x\in\mathbb{R}}
+\phi(x)
+\;=\;
+\lambda|x| + \frac{1}{2\alpha}(x-v)^2.
+\end{equation}
+We solve by considering cases.
+
+\paragraph{Case 1: $x>0$.}
+Then $|x|=x$, and
+\[
+\phi(x) = \lambda x + \frac{1}{2\alpha}(x-v)^2.
+\]
+Differentiating and setting to zero:
+\[
+\phi'(x) = \lambda + \frac{1}{\alpha}(x-v) = 0
+\quad\Rightarrow\quad
+x = v - \alpha\lambda.
+\]
+This solution is valid only if $x>0$, i.e.\ $v>\alpha\lambda$.
+
+\paragraph{Case 2: $x<0$.}
+Then $|x|=-x$, and
+\[
+\phi(x) = -\lambda x + \frac{1}{2\alpha}(x-v)^2.
+\]
+Differentiating and setting to zero:
+\[
+\phi'(x) = -\lambda + \frac{1}{\alpha}(x-v) = 0
+\quad\Rightarrow\quad
+x = v + \alpha\lambda.
+\]
+This is valid only if $x<0$, i.e.\ $v<-\alpha\lambda$.
+
+\paragraph{Case 3: $x=0$.}
+If $|v|\le \alpha\lambda$, then neither of the above stationary points lies in its corresponding region. One can verify that the minimizer occurs at $x=0$.
+
+Combining cases yields the soft-thresholding operator:
+\begin{equation}
+\mathrm{prox}_{\alpha \lambda\|\cdot\|_1}(v)_i
+=
+\mathrm{sign}(v_i)\max\{|v_i|-\alpha\lambda,\,0\}.
+\end{equation}
+Equivalently, in vector form,
+\begin{equation}
+\mathrm{prox}_{\alpha \lambda\|\cdot\|_1}(v)
+=
+S_{\alpha\lambda}(v).
+\end{equation}
+
+\subsection{Worked Example 2: \texorpdfstring{$\ell_2$}{l2} Regularization (Shrinkage)}
+
+Consider
+\begin{equation}
+g(x) = \lambda \|x\|_2^2,
+\quad \lambda>0.
+\end{equation}
+Then
+\begin{equation}
+\mathrm{prox}_{\alpha g}(v)
+=
+\arg\min_x
+\left\{
+\lambda\|x\|_2^2 + \frac{1}{2\alpha}\|x-v\|_2^2
+\right\}.
+\end{equation}
+This objective is smooth and strongly convex, so we solve by setting the gradient to zero:
+\begin{align}
+\nabla_x\left(\lambda\|x\|_2^2 + \frac{1}{2\alpha}\|x-v\|_2^2\right)
+&=
+2\lambda x + \frac{1}{\alpha}(x-v)
+= 0.
+\end{align}
+Rearranging,
+\begin{equation}
+\left(2\lambda + \frac{1}{\alpha}\right)x = \frac{1}{\alpha}v
+\quad\Rightarrow\quad
+x = \frac{1}{1+2\alpha\lambda}v.
+\end{equation}
+Hence,
+\begin{equation}
+\mathrm{prox}_{\alpha \lambda\|\cdot\|_2^2}(v)
+=
+\frac{1}{1+2\alpha\lambda}v,
+\end{equation}
+which corresponds to a uniform shrinkage toward the origin.
+
+\subsection{Remark: \texorpdfstring{$\ell_2$}{l2} Norm (Not Squared)}
+
+For completeness, if instead $g(x)=\lambda\|x\|_2$ (non-squared norm), then the proximal mapping is the vector soft-thresholding (block shrinkage)
+\begin{equation}
+\mathrm{prox}_{\alpha \lambda\|\cdot\|_2}(v)
+=
+\begin{cases}
+\left(1-\frac{\alpha\lambda}{\|v\|_2}\right)v, & \|v\|_2 > \alpha\lambda,\\
+0, & \|v\|_2 \le \alpha\lambda.
+\end{cases}
+\end{equation}
+This is widely used in group sparsity and group Lasso.
+
+\section{Step Size Rules and Convergence Rates}
+
+\subsection{Step Size Selection}
+
+Assume $\nabla f$ is $L$-Lipschitz continuous:
+\begin{equation}
+\|\nabla f(x)-\nabla f(y)\|_2 \le L\|x-y\|_2
+\quad \forall x,y.
+\end{equation}
+
+A standard sufficient condition for convergence of proximal gradient descent is
+\begin{equation}
+0 < \alpha \le \frac{1}{L}.
+\end{equation}
+
+\paragraph{Backtracking line search.}
+When $L$ is unknown or conservative, one may use backtracking. Starting from an initial $\alpha$, repeatedly shrink $\alpha$ (e.g.\ $\alpha \leftarrow \beta\alpha$ with $\beta\in(0,1)$) until the following descent condition holds:
+\begin{equation}
+F(x^{k+1})
+\le
+f(x^k) + \langle \nabla f(x^k), x^{k+1}-x^k\rangle
++ \frac{1}{2\alpha}\|x^{k+1}-x^k\|_2^2
++ g(x^{k+1}).
+\end{equation}
+
+\subsection{Convergence Rate of Proximal Gradient Descent (ISTA)}
+
+Under convexity assumptions (convex $f$ with $L$-Lipschitz gradient, convex proper closed $g$), proximal gradient descent satisfies the suboptimality rate
+\begin{equation}
+F(x^k) - F(x^\star) = \mathcal{O}\left(\frac{1}{k}\right),
+\end{equation}
+where $x^\star$ is an optimal solution.
+
+\subsection{Accelerated Proximal Gradient Descent (FISTA)}
+
+An accelerated variant (commonly known as FISTA) achieves the improved rate
+\begin{equation}
+F(x^k) - F(x^\star) = \mathcal{O}\left(\frac{1}{k^2}\right).
+\end{equation}
+FISTA modifies the proximal gradient step by introducing a momentum term:
+\begin{align}
+y^k &= x^k + \frac{t_{k-1}-1}{t_k}(x^k - x^{k-1}),\\
+x^{k+1} &= \mathrm{prox}_{\alpha g}\bigl(y^k - \alpha\nabla f(y^k)\bigr),
+\end{align}
+with
+\begin{equation}
+t_{k+1} = \frac{1+\sqrt{1+4t_k^2}}{2},
+\quad t_0 = 1.
+\end{equation}
+
+\subsection{Strong Convexity and Linear Convergence (Optional)}
+
+If, in addition, $F$ is strongly convex (e.g.\ $f$ is strongly convex and $g$ is convex), then proximal gradient methods can achieve linear convergence:
+\begin{equation}
+F(x^k) - F(x^\star) \le C\rho^k
+\quad \text{for some } \rho\in(0,1).
+\end{equation}
+
+\section{Summary}
+
+The proximal operator enables optimization with nonsmooth convex regularizers by solving a strongly convex proximal subproblem. Proximal gradient descent applies a gradient step on the smooth component $f$ followed by a proximal mapping for $g$. When $g$ has a closed-form proximal mapping (e.g.\ $\ell_1$ or squared $\ell_2$), the method becomes especially efficient. Under standard assumptions, proximal gradient descent converges at rate $\mathcal{O}(1/k)$, while accelerated variants such as FISTA achieve $\mathcal{O}(1/k^2)$.
+
+\section{Rayleigh Quotient}
+
+\subsection{Definition}
+Let $A \in \mathbb{R}^{n \times n}$ be a real symmetric matrix and let $x \in \mathbb{R}^n$ be a nonzero vector. The \emph{Rayleigh quotient} of $A$ at $x$ is defined as
+\begin{equation}
+R(A,x) \;=\; \frac{x^\top A x}{x^\top x}.
+\end{equation}
+Since $x^\top A x$ is a scalar and $x^\top x = \|x\|_2^2 > 0$ for $x \neq 0$, the quotient is well-defined for all nonzero vectors.
+
+\subsection{Relationship to Eigenvalues}
+A key property of the Rayleigh quotient is its direct connection to eigenvalues. Suppose $x$ is an eigenvector of $A$ associated with eigenvalue $\lambda$, i.e.,
+\begin{equation}
+A x = \lambda x.
+\end{equation}
+Then substituting into the Rayleigh quotient yields
+\begin{equation}
+R(A,x)
+= \frac{x^\top (\lambda x)}{x^\top x}
+= \lambda \frac{x^\top x}{x^\top x}
+= \lambda.
+\end{equation}
+Hence, when evaluated at an eigenvector, the Rayleigh quotient recovers the corresponding eigenvalue exactly.
+
+\subsection{Geometric and Algebraic Intuition}
+The quantity $x^\top A x$ is a quadratic form that measures the interaction between the direction $x$ and the linear transformation induced by $A$. The normalization by $x^\top x$ removes dependence on the scale of $x$, so $R(A,x)$ may be interpreted as the \emph{effective stretching factor} of the transformation $A$ in the direction of $x$.
+
+More precisely, the Rayleigh quotient provides a scalar summary of how strongly $A$ acts along the direction $x$, analogous to an ``eigenvalue in the direction $x$.'' When $x$ is close to an eigenvector, $R(A,x)$ approximates the associated eigenvalue.
+
+\subsection{Extremal Characterization}
+When $A$ is symmetric, the Rayleigh quotient admits a fundamental variational characterization: its maximum and minimum values over all nonzero vectors correspond to the largest and smallest eigenvalues of $A$, respectively. In particular,
+\begin{equation}
+\lambda_{\max}(A) = \max_{x \neq 0} R(A,x),
+\qquad
+\lambda_{\min}(A) = \min_{x \neq 0} R(A,x).
+\end{equation}
+This property underlies many eigenvalue algorithms and optimization-based interpretations of spectral quantities.
+
+\subsection{Example}
+Consider the diagonal matrix
+\begin{equation}
+A = 
+\begin{bmatrix}
+3 & 0 \\
+0 & 1
+\end{bmatrix},
+\qquad
+x =
+\begin{bmatrix}
+1 \\
+1
+\end{bmatrix}.
+\end{equation}
+Then
+\begin{align}
+R(A,x)
+&= \frac{x^\top A x}{x^\top x}
+= \frac{
+\begin{bmatrix}1 & 1\end{bmatrix}
+\begin{bmatrix}3 & 0 \\ 0 & 1\end{bmatrix}
+\begin{bmatrix}1 \\ 1\end{bmatrix}
+}{
+\begin{bmatrix}1 & 1\end{bmatrix}
+\begin{bmatrix}1 \\ 1\end{bmatrix}
+}
+\\
+&= \frac{3 + 1}{2}
+= 2.
+\end{align}
+The eigenvalues of $A$ are $3$ and $1$. Since $x$ is not an eigenvector, the Rayleigh quotient does not equal an eigenvalue; however, it lies between the minimum and maximum eigenvalues, consistent with the extremal characterization.
+
+\subsection{Summary}
+The Rayleigh quotient
+\begin{equation}
+R(A,x) = \frac{x^\top A x}{x^\top x}
+\end{equation}
+serves as a normalized measure of the action of $A$ along a direction $x$. For symmetric matrices, it provides:
+\begin{itemize}
+    \item exact eigenvalues when evaluated at eigenvectors,
+    \item approximations to eigenvalues for general vectors,
+    \item and a variational principle linking extrema of $R(A,x)$ to the spectral bounds of $A$.
+\end{itemize}
+
+\end{document}
