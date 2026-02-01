@@ -7,13 +7,14 @@ wheels/
 *.egg-info
 .mypy_cache/
 notebooks/.ipynb_checkpoints/
+.ruff_cache
+.pytest_cache
+.coverage
+.pytest_cov
 
 # Virtual environments
 .venv
 
-# IDE files
-.vscode/
-.idea/
 
 # LaTeX compiled files
 *.aux
