@@ -24,3 +24,5 @@ notebooks/.ipynb_checkpoints/
 *.pdf
 *.fls
 *.fdb_latexmk
+*.bbl
+*.blg

@@ -95,21 +95,19 @@ This work makes the following contributions:
 
 \paragraph{Sparse PCA formulations and algorithms.}
 Sparse Principal Component Analysis (SPCA) is a widely studied approach for producing interpretable principal components via feature selection.
-A broad overview of SPCA objectives, algorithmic strategies, and trade-offs is provided by Zou and Xue~\cite{zou2018overviewSPCA}.
-Among early optimization methods, the generalized power method (GPower)~\cite{journee2008gpower} is a representative iterative scheme that efficiently produces sparse loading vectors through structured updates.
+Zou et al.~\cite{zou2018overviewSPCA} provide a broad overview of SPCA objectives.
+The seminal regression-based approach by Zou, Hastie, and Tibshirani~\cite{zou2018overviewSPCA} (originally 2006) introduced the Elastic Net penalty to induce sparsity.
+Alternatively, the generalized power method (GPower) by Journée et al.~\cite{journee2008gpower} offers an efficient iterative thresholding scheme that maximizes a convex function over a compact set.
 
 \paragraph{Gradient-based optimization for SPCA.}
-Recent work has emphasized gradient-based optimization frameworks for SPCA that are scalable and compatible with modern large-scale learning pipelines.
-In particular, Qiu et al.~\cite{qiu2023biometrikaGradientSPCA} develop gradient-based algorithms for sparse PCA with convergence guarantees and extend the methodology to online learning settings, demonstrating strong empirical performance in high-dimensional applications.
-These results motivate the use of first-order methods as practical alternatives to heavier convex optimization procedures.
+Recent work has moved toward gradient-based frameworks compatible with large-scale data.
+Qiu et al.~\cite{qiu2023biometrikaGradientSPCA} developed GradFPS, which utilizes Fantope Projection and Selection (FPS) within a proximal gradient method, providing global convergence guarantees and extensions to online learning.
+These methods are particularly effective in high-dimensional biological applications, such as the analysis of gene expression data popularized by Alon et al. in their colon cancer study.
 
 \paragraph{Network- and graph-aware sparse representation learning.}
-In many applications, features are connected by known relational structure (e.g., biological pathways, spatial adjacency, or interaction networks), motivating graph-aware regularization to encourage coherent or smooth representations.
-Miao et al.~\cite{miao2022genomeNetworkSPCA} incorporate genome network information into sparse PCA for correcting cell-type heterogeneity in epigenome-wide association studies, illustrating the value of exploiting network structure for interpretability and downstream scientific validity.
-
-\paragraph{Our focus.}
-In contrast to existing sparse PCA methods that either ignore explicit feature networks or do not emphasize gradient-based optimization under graph constraints, our work studies \emph{network-constrained SPCA} via a Laplacian-regularized objective optimized using a proximal gradient method.
-We focus on evaluating \emph{structured feature selection}---including support recovery quality and connectivity of the selected subgraph---in addition to explained variance, aligning the evaluation protocol with the intended role of feature networks in guiding sparse representation learning.
+In many applications, features are connected by relational structures (e.g., biological pathways or spatial adjacency).
+Miao et al.~\cite{miao2022genomeNetworkSPCA} incorporate genome network information into SPCA to correct for cell-type heterogeneity, demonstrating the value of using prior network knowledge for scientific validity.
+Our work builds on these foundations by providing a unified proximal gradient framework for network-constrained SPCA with explicit Laplacian regularization.
 
 % =========================
 % 3. Problem Setup

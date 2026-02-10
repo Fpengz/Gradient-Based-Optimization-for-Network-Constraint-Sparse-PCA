@@ -1,19 +1,25 @@
 [project]
 name = "nc-spca"
 version = "0.1.0"
-description = "Add your description here"
+description = "Gradient-Based Optimization for Network-Constrained Sparse PCA"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "matplotlib>=3.10.8",
+    "numpy>=2.2.6",
+    "pandas>=2.3.3",
+    "scikit-learn>=1.7.2",
+    "scipy>=1.15.2",
+]
+
+[dependency-groups]
+dev = [
     "black>=26.1.0",
     "ipykernel>=7.1.0",
     "jupyter>=1.1.1",
-    "matplotlib>=3.10.8",
-    "numpy>=2.2.6",
-    "pyrefly>=0.50.0",
     "pytest>=9.0.2",
     "ruff>=0.14.14",
-    "scikit-learn>=1.7.2",
+    "pyrefly>=0.50.0",
     "ty>=0.0.14",
 ]
 
@@ -22,7 +28,8 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["src*", "data*"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["."]

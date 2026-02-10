@@ -19,8 +19,6 @@ $$
 - Feature selection
 - Noise robustness
 
-Adding sparsity (e.g. $ \|w\|_0 \le k $) makes the problem non-convex and NP-hard.
-
 ---
 
 ## 3. Sparse PCA (SPCA)
@@ -34,19 +32,10 @@ Key reference:
 
 ---
 
-## 4. Constraint Taxonomy
-| Constraint Type | Smooth | Gradient-Based | Requires Proximal |
-|-----------------|--------|----------------|-------------------|
-| L2 norm         | Yes    | Yes            | No                |
-| L1 sparsity     | No     | Subgradient    | Yes               |
-| Graph Laplacian | Yes    | Yes            | No                |
-
----
-
-## 5. Network-Constrained SPCA
+## 4. Network-Constrained SPCA
 Given graph $ G = (V,E) $ over features, introduce Laplacian \(L\):
 $$
-\max_w \; w^\top \Sigma w - \lambda_1 \|w\|_1 - \lambda_2 w^\top L w
+\max_w \; w^\top \Sigma w - \lambda_1 \|w\|_1 - \lambda_2 w^\top L w \quad \text{s.t. } \|w\|_2 \le 1
 $$
 
 Encourages:
@@ -55,32 +44,37 @@ Encourages:
 
 ---
 
-## 6. Optimization Perspective
+## 5. Optimization Perspective
 - Smooth part: variance + Laplacian penalty
 - Non-smooth part: sparsity term
 - Suitable method: **Proximal Gradient Descent**
 
 ---
 
-## 7. Suggested First Milestones
-1. Re-derive PCA and SPCA objectives
-2. Implement proximal gradient for L1-SPCA
-3. Extend to graph-regularized SPCA
-4. Analyze convergence and scaling
+## 6. Project Milestones
+
+1.  **[DONE] Core Estimators**: Implemented Zou-SPCA (Elastic Net), GradFPS (Fantope), GPM (Power Method), and NC-SPCA.
+2.  **[DONE] Synthetic Benchmarks**: Replicated Zou's 10-variable example and Qiu's high-dimensional spiked model.
+3.  **[DONE] Real Data Benchmarks**: Replicated Pitprop analysis and Alon et al. Colon Cancer gene expression study.
+4.  **[DONE] Graph Generators**: Implemented Chain, Grid, RGG, and SBM generators for feature networks.
+5.  **[TODO] Convergence Analysis**: Refine mathematical proofs for stationary point convergence under graph constraints.
 
 ---
 
-## 8. Next Steps
-- Explore nonconvex sparsity (L0, SCAD)
-- Study convergence guarantees
-- Compare with greedy and SDP approaches
+## 7. Modules
 
-
-## 9. Modules
-
-- proximal gradient solver (soft-threshold + L2 projection)
-- objective + metrics
-- synthetic graph generators
-- synthetic data generator (spiked covariance with structured sparse support)
-- baselines: PCA, L1-SPCA (λ2=0), Graph-PCA (λ1=0)
-- evaluation: explained variance, F1, LCC ratio, Laplacian smoothness, runtime
+- **Estimators (`src/models/`)**:
+    - `ZouSparsePCA`: Regression-based SPCA.
+    - `NetworkSparsePCA`: Graph-regularized SPCA using Proximal Gradient.
+    - `GradFPS`: Convex Fantope relaxation.
+    - `GeneralizedPowerMethod`: Efficient power iteration with thresholding.
+- **Data (`data/`)**:
+    - `pitprop.py`: Pitprop correlation matrix.
+    - `colon_x.csv`: Alon et al. genomic data.
+    - `synthetic/`: Generators for spiked covariance and graph-structured data.
+- **Benchmarks (`experiments/`)**:
+    - `benchmark_comparison.py`: Cross-model comparison.
+    - `colon_benchmark.py`: High-dimensional biological data test.
+    - `nc_spca_benchmark.py`: Support recovery on feature graphs.
+- **Evaluation (`doc/experiments/`)**:
+    - Explained variance, F1 score, Largest Connected Component (LCC) ratio, Laplacian smoothness.
