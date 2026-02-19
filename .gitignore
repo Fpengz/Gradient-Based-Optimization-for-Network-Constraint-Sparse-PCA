@@ -15,7 +15,6 @@ notebooks/.ipynb_checkpoints/
 # Virtual environments
 .venv
 
-
 # LaTeX compiled files
 *.aux
 *.log
@@ -26,3 +25,6 @@ notebooks/.ipynb_checkpoints/
 *.fdb_latexmk
 *.bbl
 *.blg
+
+# IDE and editor files
+.idea/
