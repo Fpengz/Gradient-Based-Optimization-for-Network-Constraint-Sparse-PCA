@@ -14,17 +14,26 @@ from sklearn.exceptions import ConvergenceWarning
 from src.models import (
     GeneralizedPowerMethod,
     NetworkSparsePCA,
+    NetworkSparsePCA_StiefelManifold,
     NetworkSparsePCA_MASPG_CAR,
     PCAEstimator,
     SparsePCA_L1_ProxGrad,
     ZouSparsePCA,
 )
-from src.utils.graph import GraphData, chain_graph, er_graph, grid_graph, sbm_graph
+from src.utils.graph import (
+    GraphData,
+    adjacency_to_laplacian,
+    chain_graph,
+    er_graph,
+    grid_graph,
+    sbm_graph,
+)
 from src.utils.metrics import (
     connected_support_lcc_ratio,
     explained_variance,
     laplacian_energy,
     support_metrics,
+    topk_support_metrics,
 )
 
 
@@ -43,6 +52,7 @@ class SyntheticBenchmarkConfig:
     graph_sbm_p_in: float = 0.25
     graph_sbm_p_out: float = 0.02
     support_threshold: float = 1e-6
+    graph_misspec_rate: float = 0.0
     n_components: int = 1
     random_state: int = 42
 
@@ -124,6 +134,43 @@ def _sample_connected_support(
     return np.array(sorted(set(support)), dtype=int)
 
 
+def _perturb_graph_for_misspecification(
+    graph: GraphData,
+    perturb_rate: float,
+    random_state: int | None = None,
+) -> GraphData:
+    """Flip a fraction of undirected edges to simulate graph misspecification."""
+    if perturb_rate <= 0.0:
+        return graph
+    if perturb_rate > 1.0:
+        raise ValueError("perturb_rate must be in [0, 1].")
+    rng = np.random.default_rng(random_state)
+    A = graph.adjacency.tocsr().copy()
+    n = A.shape[0]
+    tri = np.triu_indices(n, k=1)
+    a_dense = (A.toarray() > 0).astype(float)
+    n_pairs = tri[0].size
+    n_flip = int(np.floor(perturb_rate * n_pairs))
+    if n_flip <= 0:
+        return graph
+    flip_idx = rng.choice(n_pairs, size=n_flip, replace=False)
+    r = tri[0][flip_idx]
+    c = tri[1][flip_idx]
+    a_dense[r, c] = 1.0 - a_dense[r, c]
+    a_dense[c, r] = a_dense[r, c]
+    np.fill_diagonal(a_dense, 0.0)
+    A_new = sp.csr_matrix(a_dense)
+    L_new = adjacency_to_laplacian(A_new, laplacian_type=graph.laplacian_type)
+    metadata = dict(graph.metadata)
+    metadata["misspec_perturb_rate"] = float(perturb_rate)
+    return GraphData(
+        adjacency=A_new,
+        laplacian=L_new,
+        laplacian_type=graph.laplacian_type,
+        metadata=metadata,
+    )
+
+
 def generate_graph_structured_data(
     cfg: SyntheticBenchmarkConfig,
     random_state: int | None = None,
@@ -179,23 +226,42 @@ def _sanitize_component(component: np.ndarray) -> np.ndarray:
     return w / norm
 
 
+def _estimated_support(
+    component: np.ndarray,
+    support_threshold: float,
+    relative_threshold: float = 1e-3,
+) -> np.ndarray:
+    """Extract support with an absolute+relative threshold for stability."""
+    w = np.asarray(component, dtype=float).reshape(-1)
+    if w.size == 0:
+        return np.array([], dtype=int)
+    abs_w = np.abs(w)
+    scale = float(abs_w.max())
+    if not np.isfinite(scale) or scale <= 0.0:
+        return np.array([], dtype=int)
+    threshold = max(float(support_threshold), float(relative_threshold) * scale)
+    return np.flatnonzero(abs_w > threshold)
+
+
 def build_baselines(
     lambda1: float = 0.15,
     lambda2: float = 0.25,
     max_iter: int = 400,
     random_state: int = 0,
+    n_components: int = 1,
+    include_stiefel_manifold: bool = False,
 ) -> dict[str, Any]:
     """Build a targeted comparison set spanning sparsity/graph/optimizer axes."""
-    return {
-        "PCA": PCAEstimator(n_components=1),
+    baselines: dict[str, Any] = {
+        "PCA": PCAEstimator(n_components=n_components),
         "L1-SPCA-ProxGrad": SparsePCA_L1_ProxGrad(
-            n_components=1,
+            n_components=n_components,
             lambda1=lambda1,
             max_iter=max_iter,
             monotone_backtracking=True,
         ),
         "Graph-PCA": NetworkSparsePCA(
-            n_components=1,
+            n_components=n_components,
             lambda1=0.0,
             lambda2=lambda2,
             max_iter=max_iter,
@@ -203,7 +269,7 @@ def build_baselines(
             random_state=random_state,
         ),
         "NetSPCA-PG": NetworkSparsePCA(
-            n_components=1,
+            n_components=n_components,
             lambda1=lambda1,
             lambda2=lambda2,
             max_iter=max_iter,
@@ -211,24 +277,33 @@ def build_baselines(
             random_state=random_state,
         ),
         "NetSPCA-MASPG-CAR": NetworkSparsePCA_MASPG_CAR(
-            n_components=1,
+            n_components=n_components,
             lambda1=lambda1,
             lambda2=lambda2,
             max_iter=max_iter,
             random_state=random_state,
         ),
         "GPower": GeneralizedPowerMethod(
-            n_components=1,
+            n_components=n_components,
             gamma=lambda1,
             max_iter=max_iter,
         ),
         "ElasticNet-SPCA": ZouSparsePCA(
-            n_components=1,
+            n_components=n_components,
             alpha=max(lambda1 * 40.0, 1e-6),
             lambda_l2=1e-3,
             max_iter=min(max_iter, 200),
         ),
     }
+    if include_stiefel_manifold:
+        baselines["NetSPCA-Stiefel"] = NetworkSparsePCA_StiefelManifold(
+            n_components=n_components,
+            lambda1=lambda1,
+            lambda2=lambda2,
+            max_iter=max_iter,
+            random_state=random_state,
+        )
+    return baselines
 
 
 def run_benchmark_once(
@@ -237,12 +312,21 @@ def run_benchmark_once(
     w_true: np.ndarray,
     methods: dict[str, Any],
     support_threshold: float = 1e-6,
+    graph_misspec_rate: float = 0.0,
+    random_state: int | None = None,
 ) -> list[dict[str, Any]]:
     """Run one benchmark pass and return per-method metric records."""
     records: list[dict[str, Any]] = []
     true_support = np.flatnonzero(np.abs(w_true) > support_threshold)
-    L = graph.laplacian
-    A = graph.adjacency
+    graph_eval = graph
+    if graph_misspec_rate > 0.0:
+        graph_eval = _perturb_graph_for_misspecification(
+            graph,
+            perturb_rate=graph_misspec_rate,
+            random_state=random_state,
+        )
+    L = graph_eval.laplacian
+    A = graph_eval.adjacency
 
     for method_name, estimator in methods.items():
         tic = perf_counter()
@@ -250,7 +334,7 @@ def run_benchmark_once(
             warnings.simplefilter("ignore", category=RuntimeWarning)
             warnings.simplefilter("ignore", category=ConvergenceWarning)
             if isinstance(estimator, NetworkSparsePCA):
-                estimator.fit(X, graph=graph)
+                estimator.fit(X, graph=graph_eval)
             else:
                 estimator.fit(X)
         runtime_sec = perf_counter() - tic
@@ -258,8 +342,13 @@ def run_benchmark_once(
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             w_hat = _sanitize_component(_first_component(estimator))
-        est_support = np.flatnonzero(np.abs(w_hat) > support_threshold)
+        est_support = _estimated_support(w_hat, support_threshold=support_threshold)
         s_metrics = support_metrics(est_support, true_support)
+        topk_metrics = topk_support_metrics(
+            w_hat,
+            true_support=true_support,
+            k=int(true_support.size),
+        )
 
         record = {
             "method": method_name,
@@ -269,8 +358,12 @@ def run_benchmark_once(
             "precision": float(s_metrics["precision"]),
             "recall": float(s_metrics["recall"]),
             "f1": float(s_metrics["f1"]),
+            "precision_topk": float(topk_metrics["precision"]),
+            "recall_topk": float(topk_metrics["recall"]),
+            "f1_topk": float(topk_metrics["f1"]),
             "lcc_ratio": connected_support_lcc_ratio(est_support, A),
             "laplacian_energy": laplacian_energy(w_hat, L),
+            "graph_misspec_rate": float(graph_misspec_rate),
             "converged": bool(getattr(estimator, "converged_", False)),
             "n_iter": _safe_scalar(getattr(estimator, "n_iter_", None)),
             "objective": _safe_scalar(getattr(estimator, "objective_", None)),
@@ -302,6 +395,8 @@ def run_repeated_benchmark(
             w_true=w_true,
             methods=methods,
             support_threshold=cfg.support_threshold,
+            graph_misspec_rate=cfg.graph_misspec_rate,
+            random_state=rep_seed,
         )
         for row in run_records:
             row["repeat"] = rep
@@ -312,6 +407,7 @@ def run_repeated_benchmark(
             row["support_size_true"] = cfg.support_size
             row["noise_std"] = cfg.noise_std
             row["signal_strength"] = cfg.signal_strength
+            row["graph_misspec_rate"] = cfg.graph_misspec_rate
         records.extend(run_records)
 
     return records
@@ -331,6 +427,9 @@ def summarize_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         "precision",
         "recall",
         "f1",
+        "precision_topk",
+        "recall_topk",
+        "f1_topk",
         "lcc_ratio",
         "laplacian_energy",
         "runtime_sec",

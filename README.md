@@ -31,6 +31,16 @@ This project uses `uv` for modern, fast Python package management.
     ```
     This runs: `PCA`, `L1-SPCA-ProxGrad`, `Graph-PCA`, `NetSPCA-PG`, `NetSPCA-MASPG-CAR`, `GPower`, and `ElasticNet-SPCA`.
 
+*   **Stress graph misspecification (graph-quality robustness):**
+    ```bash
+    uv run python scripts/run_experiment.py --dataset synthetic --graph-misspec-rate 0.15 --n-repeats 3
+    ```
+
+*   **Multi-component benchmark with manifold baseline:**
+    ```bash
+    uv run python scripts/run_experiment.py --dataset synthetic --n-components 3 --include-stiefel-manifold --n-repeats 3
+    ```
+
 *   **Hyperparameter sweeps (`\lambda_1`, `\lambda_2`) with plots + LaTeX tables:**
     ```bash
     uv run python scripts/run_sweep.py --n-repeats 2
@@ -56,6 +66,7 @@ This project uses `uv` for modern, fast Python package management.
 | **Zou SPCA** | Elastic Net / Regression | Zou et al. (2006) |
 | **GPM** | Generalized Power Method | Journée et al. (2010) |
 | **NC-SPCA** | Laplacian Regularization / Proximal Grad | Wang Zhoufu (2026) |
+| **NC-SPCA (Stiefel)** | Manifold proximal gradient + Stiefel retraction | Chen et al. (ManPG lineage) |
 
 ---
 
@@ -108,6 +119,8 @@ Classical PCA produces dense loading vectors, which are difficult to interpret i
 **Network-Constrained SPCA** incorporates prior graph information via a Laplacian penalty:
 $$ \min_{\|w\|_2 \le 1} -w^\top \hat\Sigma w + \lambda_1 \|w\|_1 + \lambda_2 w^\top L w $$
 This encourages the selection of **connected, smooth supports** on the feature network, leading to more scientifically valid factor discovery.
+
+For regularization-path workflows, `NetworkSparsePCA.fit_path(...)` provides warm-start continuation across `lambda1`/`lambda2` grids.
 
 ---
 

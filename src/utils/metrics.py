@@ -44,12 +44,32 @@ def support_metrics(
     return {"precision": precision, "recall": recall, "f1": f1}
 
 
+def topk_support_metrics(
+    weights: np.ndarray,
+    true_support: Iterable[int] | np.ndarray,
+    k: int,
+) -> dict[str, float]:
+    """Support metrics using the top-k absolute coefficients."""
+    w = np.asarray(weights, dtype=float).reshape(-1)
+    if k <= 0 or w.size == 0:
+        return {"precision": 0.0, "recall": 0.0, "f1": 0.0}
+    k_eff = min(int(k), w.size)
+    idx = np.argpartition(np.abs(w), -k_eff)[-k_eff:]
+    return support_metrics(idx, true_support)
+
+
 def laplacian_energy(vector: np.ndarray, laplacian: sp.spmatrix | np.ndarray) -> float:
     x = np.asarray(vector, dtype=float).reshape(-1)
+    if not np.all(np.isfinite(x)):
+        return float("nan")
     L = laplacian if sp.issparse(laplacian) else np.asarray(laplacian, dtype=float)
     if sp.issparse(L):
-        return float(x @ (L @ x))
-    return float(x @ L @ x)
+        with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+            value = float(x @ (L @ x))
+    else:
+        with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+            value = float(x @ L @ x)
+    return value if np.isfinite(value) else float("nan")
 
 
 def connected_support_lcc_ratio(

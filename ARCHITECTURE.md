@@ -8,11 +8,12 @@
   - `ZouSparsePCA`: Elastic-Net SPCA style baseline.
   - `GeneralizedPowerMethod`: GPower baseline.
   - `NetworkSparsePCA`: graph + sparsity model (`pg` and `maspg_car` modes).
+  - `NetworkSparsePCA_StiefelManifold`: multi-component manifold proximal-gradient solver on the Stiefel set.
 - `src/utils/`
   - `graph.py`: graph constructors and Laplacians.
-  - `metrics.py`: explained variance, support F1, connectivity, smoothness.
+  - `metrics.py`: explained variance, support F1, top-k support F1, connectivity, smoothness.
 - `src/experiments/`
-  - `synthetic_benchmark.py`: synthetic data generation, baseline construction, benchmark execution, summary aggregation.
+  - `synthetic_benchmark.py`: synthetic data generation, baseline construction, graph-misspecification perturbation, benchmark execution, summary aggregation.
   - `real_benchmark.py`: colon/pitprop loading, feature-graph construction, and real-data method comparison.
 
 ## Runner scripts
@@ -36,5 +37,9 @@ All estimators expose:
 - `converged_`
 - `n_iter_`
 - `objective_`
+
+`NetworkSparsePCA` additionally exposes:
+
+- `fit_path(...)` for warm-start continuation across `(lambda1, lambda2)` grids.
 
 This keeps the comparison suite fair and interchangeable.

@@ -2,6 +2,7 @@ import numpy as np
 
 from src.experiments.synthetic_benchmark import (
     SyntheticBenchmarkConfig,
+    _perturb_graph_for_misspecification,
     build_baselines,
     generate_graph_structured_data,
     run_benchmark_once,
@@ -64,3 +65,57 @@ def test_repeated_benchmark_summary_non_empty():
     assert len(records) == 4
     assert len(summary) == 2
     assert all("f1_mean" in row for row in summary)
+
+
+def test_graph_misspecification_perturbs_adjacency():
+    cfg = SyntheticBenchmarkConfig(n_features=25, graph_type="grid", random_state=5)
+    sample = generate_graph_structured_data(cfg)
+    graph = sample["graph"]
+    graph_perturbed = _perturb_graph_for_misspecification(
+        graph,
+        perturb_rate=0.2,
+        random_state=7,
+    )
+    diff = (graph.adjacency != graph_perturbed.adjacency).nnz
+    assert diff > 0
+
+
+def test_run_benchmark_once_reports_topk_and_misspecification_metrics():
+    cfg = SyntheticBenchmarkConfig(
+        n_samples=40,
+        n_features=20,
+        support_size=5,
+        graph_type="chain",
+        graph_misspec_rate=0.15,
+        random_state=3,
+    )
+    sample = generate_graph_structured_data(cfg)
+    methods = {
+        "NetSPCA-PG": build_baselines(
+            lambda1=0.1, lambda2=0.2, max_iter=40, random_state=0
+        )["NetSPCA-PG"],
+    }
+    records = run_benchmark_once(
+        sample["X"],
+        graph=sample["graph"],
+        w_true=sample["w_true"],
+        methods=methods,
+        support_threshold=cfg.support_threshold,
+        graph_misspec_rate=cfg.graph_misspec_rate,
+        random_state=cfg.random_state,
+    )
+    row = records[0]
+    assert "f1_topk" in row
+    assert "graph_misspec_rate" in row
+
+
+def test_build_baselines_can_include_stiefel_solver():
+    methods = build_baselines(
+        lambda1=0.1,
+        lambda2=0.2,
+        max_iter=20,
+        random_state=0,
+        n_components=2,
+        include_stiefel_manifold=True,
+    )
+    assert "NetSPCA-Stiefel" in methods

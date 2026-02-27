@@ -304,7 +304,8 @@ class SparsePCA_L1_ProxGrad(BaseEstimator, TransformerMixin, EstimatorStateMixin
             # Sequential deflation for fair multi-component comparisons.
             w_unit = w / (np.linalg.norm(w) + 1e-12)
             if np.all(np.isfinite(w_unit)) and np.all(np.isfinite(X_work)):
-                scores = X_work @ w_unit
+                with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+                    scores = X_work @ w_unit
                 if np.all(np.isfinite(scores)):
                     X_work = X_work - np.outer(scores, w_unit)
 

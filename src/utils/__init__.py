@@ -14,6 +14,7 @@ from .metrics import (
     explained_variance,
     laplacian_energy,
     support_metrics,
+    topk_support_metrics,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "explained_variance",
     "laplacian_energy",
     "support_metrics",
+    "topk_support_metrics",
 ]

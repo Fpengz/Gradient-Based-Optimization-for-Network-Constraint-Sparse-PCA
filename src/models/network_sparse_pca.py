@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import scipy.sparse as sp
+import scipy.sparse.linalg as spla
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.decomposition import PCA
 
@@ -92,9 +93,20 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         pca.fit(X_centered)
         norm_sigma = float(pca.explained_variance_[0])
         if sp.issparse(L):
-            from scipy.sparse.linalg import eigsh
+            L_sparse = sp.csr_matrix(L)
+            if L_sparse.nnz == 0:
+                norm_L = 0.0
+            else:
+                from scipy.sparse.linalg import ArpackError, eigsh
 
-            norm_L = float(eigsh(L, k=1, which="LM", return_eigenvectors=False)[0])
+                try:
+                    norm_L = float(
+                        eigsh(
+                            L_sparse, k=1, which="LM", return_eigenvectors=False
+                        )[0]
+                    )
+                except ArpackError:
+                    norm_L = float(spla.norm(L_sparse, ord=2))
         else:
             L_dense = np.asarray(L, dtype=float)
             norm_L = float(np.linalg.norm(L_dense, 2))
@@ -107,27 +119,36 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         L: sp.spmatrix | np.ndarray,
     ) -> np.ndarray:
         n = Xc.shape[0]
-        grad_sigma = -2.0 / n * (Xc.T @ (Xc @ w))
+        with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+            grad_sigma = -2.0 / n * (Xc.T @ (Xc @ w))
+        grad_sigma = np.nan_to_num(grad_sigma, nan=0.0, posinf=0.0, neginf=0.0)
         if sp.issparse(L):
             grad_L = 2.0 * self.lambda2 * (L @ w)
         else:
             L_dense = np.asarray(L, dtype=float)
             grad_L = 2.0 * self.lambda2 * (L_dense @ w)
+        grad_L = np.nan_to_num(np.asarray(grad_L), nan=0.0, posinf=0.0, neginf=0.0)
         return grad_sigma + np.asarray(grad_L).reshape(-1)
 
     def _objective(
         self, Xc: np.ndarray, w: np.ndarray, L: sp.spmatrix | np.ndarray
     ) -> float:
         n = Xc.shape[0]
-        sigma_term = -(w @ (Xc.T @ (Xc @ w))) / n
+        with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+            sigma_term = -(w @ (Xc.T @ (Xc @ w))) / n
         if sp.issparse(L):
-            lap = float(w @ (L @ w))
+            with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+                lap = float(w @ (L @ w))
         else:
             L_dense = np.asarray(L, dtype=float)
-            lap = float(w @ (L_dense @ w))
-        return float(
+            with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+                lap = float(w @ (L_dense @ w))
+        value = float(
             sigma_term + self.lambda1 * np.linalg.norm(w, 1) + self.lambda2 * lap
         )
+        if not np.isfinite(value):
+            return float("inf")
+        return value
 
     def _initialize_component(
         self, Xc: np.ndarray, rng: np.random.Generator
@@ -173,8 +194,12 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         Xc: np.ndarray,
         L: sp.spmatrix | np.ndarray,
         rng: np.random.Generator,
+        warm_start: np.ndarray | None = None,
     ) -> tuple[np.ndarray, dict[str, list[float]], bool, int]:
-        w = self._initialize_component(Xc, rng)
+        if warm_start is None:
+            w = self._initialize_component(Xc, rng)
+        else:
+            w = self._proj_l2_ball(np.asarray(warm_start, dtype=float).reshape(-1))
         eta = (
             1.0 / max(self._estimate_lipschitz(Xc, L), 1e-12)
             if self.learning_rate == "auto"
@@ -190,11 +215,23 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         converged = False
         n_iter = self.max_iter
         w_prev = w.copy()
+        grad_prev = self._smooth_grad(Xc, w, L)
+        prev_obj: float | None = None
 
         for it in range(self.max_iter):
             if not np.all(np.isfinite(w)):
                 return np.zeros_like(w), local_history, False, it + 1
             w_old = w.copy()
+            grad_old = self._smooth_grad(Xc, w_old, L)
+
+            if self.algorithm == "maspg_car" and it > 0:
+                d = w_old - w_prev
+                r = grad_old - grad_prev
+                denom = float(np.dot(d, r))
+                if np.isfinite(denom) and denom > 1e-16:
+                    eta_bb = float(np.dot(d, d) / denom)
+                    if np.isfinite(eta_bb) and eta_bb > 0.0:
+                        eta = float(np.clip(eta_bb, 1e-8, 1e2))
             if self.algorithm == "maspg_car" and it > 0:
                 # Monotone inertial heuristic with safe cap; restart if objective worsens.
                 beta = min(0.9, (it - 1) / (it + 2))
@@ -212,11 +249,17 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
                 if obj_trial > obj_old + 1e-12:
                     # Restart: drop inertia and recompute from current iterate.
                     w_trial, eta, _ = self._accept_with_backtracking(Xc, w, L, eta)
-            w_prev = w.copy()
+            w_prev = w_old
+            grad_prev = grad_old
             w = w_trial
 
             obj = self._objective(Xc, w, L)
             rel = np.linalg.norm(w - w_old) / (np.linalg.norm(w_old) + 1e-12)
+            rel_obj = (
+                abs(obj - prev_obj) / (abs(prev_obj) + 1e-12)
+                if prev_obj is not None and np.isfinite(prev_obj)
+                else np.inf
+            )
             local_history["objective"].append(float(obj))
             local_history["step_size"].append(float(eta))
             local_history["rel_change"].append(float(rel))
@@ -240,14 +283,15 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
                 w_refined[active] = s_active
                 w = self._proj_l2_ball(w_refined)
 
-            if rel < self.tol:
+            if rel < self.tol or rel_obj < self.tol:
                 converged = True
                 n_iter = it + 1
                 break
+            prev_obj = obj
 
         return w, local_history, converged, n_iter
 
-    def fit(self, X, L=None, graph=None, y=None):
+    def fit(self, X, L=None, graph=None, y=None, init_components=None):
         self._init_fit_state()
         X = np.asarray(X, dtype=float)
         n_samples, n_features = X.shape
@@ -274,10 +318,22 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         self.component_n_iter_ = []
         X_current = X_centered.copy()
         objective_by_component = []
+        warm_components = None
+        if init_components is not None:
+            warm_components = np.asarray(init_components, dtype=float)
+            if warm_components.ndim != 2:
+                raise ValueError("init_components must be 2D with shape (k, p).")
+            if warm_components.shape[1] != n_features:
+                raise ValueError(
+                    "init_components feature dimension does not match input X."
+                )
 
         for comp in range(k):
+            warm_w = None
+            if warm_components is not None and comp < warm_components.shape[0]:
+                warm_w = warm_components[comp]
             w, local_hist, converged, n_iter = self._fit_one_component(
-                X_current, L, rng
+                X_current, L, rng, warm_start=warm_w
             )
             self.components_[comp, :] = w
             self.component_converged_.append(converged)
@@ -296,7 +352,8 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             # Sequential deflation (shared policy across Euclidean baselines).
             w_unit = w / (np.linalg.norm(w) + 1e-12)
             if np.all(np.isfinite(w_unit)) and np.all(np.isfinite(X_current)):
-                scores = X_current @ w_unit
+                with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+                    scores = X_current @ w_unit
                 if np.all(np.isfinite(scores)):
                     X_current = X_current - np.outer(scores, w_unit)
 
@@ -305,6 +362,42 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         self.objective_ = float(sum(h[-1] for h in objective_by_component if h))
         self.graph_laplacian_ = L
         return self
+
+    def fit_path(
+        self,
+        X,
+        L=None,
+        graph=None,
+        lambda1_grid: list[float] | tuple[float, ...] | None = None,
+        lambda2_grid: list[float] | tuple[float, ...] | None = None,
+    ) -> list[dict[str, object]]:
+        """Fit a continuation path over (lambda1, lambda2) with warm starts."""
+        l1_vals = list(lambda1_grid) if lambda1_grid is not None else [self.lambda1]
+        l2_vals = list(lambda2_grid) if lambda2_grid is not None else [self.lambda2]
+        if not l1_vals or not l2_vals:
+            raise ValueError("lambda grids must be non-empty.")
+
+        base_params = self.get_params(deep=False)
+        path: list[dict[str, object]] = []
+        warm_components: np.ndarray | None = None
+        for l1 in l1_vals:
+            for l2 in l2_vals:
+                params = dict(base_params)
+                params["lambda1"] = float(l1)
+                params["lambda2"] = float(l2)
+                model = self.__class__(**params)
+                model.fit(X, L=L, graph=graph, init_components=warm_components)
+                path.append(
+                    {
+                        "lambda1": float(l1),
+                        "lambda2": float(l2),
+                        "model": model,
+                        "warm_started": warm_components is not None,
+                        "converged": bool(getattr(model, "converged_", False)),
+                    }
+                )
+                warm_components = model.components_.copy()
+        return path
 
     def transform(self, X):
         X = np.asarray(X, dtype=float)
@@ -318,3 +411,135 @@ class NetworkSparsePCA_MASPG_CAR(NetworkSparsePCA):
     def __init__(self, *args, **kwargs):
         kwargs.setdefault("algorithm", "maspg_car")
         super().__init__(*args, **kwargs)
+
+
+class NetworkSparsePCA_StiefelManifold(NetworkSparsePCA):
+    """Multi-component manifold proximal-gradient solver on the Stiefel set."""
+
+    @staticmethod
+    def _sym(M: np.ndarray) -> np.ndarray:
+        return 0.5 * (M + M.T)
+
+    @staticmethod
+    def _retract_stiefel(Y: np.ndarray) -> np.ndarray:
+        try:
+            U, _, Vt = np.linalg.svd(Y, full_matrices=False)
+            return U @ Vt
+        except np.linalg.LinAlgError:
+            Q, _ = np.linalg.qr(Y)
+            return Q[:, : Y.shape[1]]
+
+    def _matrix_objective(
+        self, Xc: np.ndarray, V: np.ndarray, L: sp.spmatrix | np.ndarray
+    ) -> float:
+        n = Xc.shape[0]
+        XV = Xc @ V
+        sigma_term = -float(np.sum(XV * XV) / n)
+        if sp.issparse(L):
+            LV = L @ V
+        else:
+            LV = np.asarray(L, dtype=float) @ V
+        lap_term = float(np.sum(V * LV))
+        val = sigma_term + self.lambda1 * float(np.sum(np.abs(V))) + self.lambda2 * lap_term
+        return float(val) if np.isfinite(val) else float("inf")
+
+    def _matrix_grad(
+        self, Xc: np.ndarray, V: np.ndarray, L: sp.spmatrix | np.ndarray
+    ) -> np.ndarray:
+        n = Xc.shape[0]
+        grad_sigma = -2.0 / n * (Xc.T @ (Xc @ V))
+        if sp.issparse(L):
+            grad_L = 2.0 * self.lambda2 * (L @ V)
+        else:
+            grad_L = 2.0 * self.lambda2 * (np.asarray(L, dtype=float) @ V)
+        grad = grad_sigma + np.asarray(grad_L)
+        return np.nan_to_num(grad, nan=0.0, posinf=0.0, neginf=0.0)
+
+    def fit(self, X, L=None, graph=None, y=None, init_components=None):
+        self._init_fit_state()
+        X = np.asarray(X, dtype=float)
+        n_samples, n_features = X.shape
+        self.mean_ = np.mean(X, axis=0)
+        Xc = X - self.mean_
+        if graph is not None and L is None:
+            L = (
+                getattr(graph, "laplacian", None)
+                if not isinstance(graph, dict)
+                else graph.get("laplacian")
+            )
+        if L is None:
+            L = sp.eye(n_features, format="csr")
+
+        k = min(self.n_components, n_features)
+        if init_components is not None:
+            init_components = np.asarray(init_components, dtype=float)
+            if init_components.ndim != 2 or init_components.shape[1] != n_features:
+                raise ValueError("init_components must have shape (k, p).")
+            V0 = init_components[:k].T
+            V = self._retract_stiefel(V0)
+        else:
+            pca = PCA(n_components=k)
+            pca.fit(Xc)
+            V = pca.components_.T
+            V = self._retract_stiefel(V)
+
+        eta = (
+            1.0 / max(self._estimate_lipschitz(Xc, L), 1e-12)
+            if self.learning_rate == "auto"
+            else float(self.learning_rate)
+        )
+
+        prev_obj: float | None = None
+        converged = False
+        local_hist_obj: list[float] = []
+        local_hist_step: list[float] = []
+        local_hist_rel: list[float] = []
+        n_iter = self.max_iter
+
+        for it in range(self.max_iter):
+            grad = self._matrix_grad(Xc, V, L)
+            riem_grad = grad - V @ self._sym(V.T @ grad)
+            eta_trial = eta
+            obj_old = self._matrix_objective(Xc, V, L)
+            while True:
+                Y = V - eta_trial * riem_grad
+                S = self._soft_threshold(Y, eta_trial * self.lambda1)
+                V_trial = self._retract_stiefel(S)
+                if not self.monotone_backtracking:
+                    break
+                obj_new = self._matrix_objective(Xc, V_trial, L)
+                if obj_new <= obj_old + 1e-12 or eta_trial < 1e-16:
+                    break
+                eta_trial *= 0.5
+
+            rel = float(
+                np.linalg.norm(V_trial - V, ord="fro")
+                / (np.linalg.norm(V, ord="fro") + 1e-12)
+            )
+            obj = self._matrix_objective(Xc, V_trial, L)
+            rel_obj = (
+                abs(obj - prev_obj) / (abs(prev_obj) + 1e-12)
+                if prev_obj is not None and np.isfinite(prev_obj)
+                else np.inf
+            )
+            local_hist_obj.append(float(obj))
+            local_hist_step.append(float(eta_trial))
+            local_hist_rel.append(rel)
+            V = V_trial
+            eta = eta_trial
+            if rel < self.tol or rel_obj < self.tol:
+                converged = True
+                n_iter = it + 1
+                break
+            prev_obj = obj
+
+        self.components_ = V.T
+        self.n_components_ = k
+        self.converged_ = converged
+        self.n_iter_ = n_iter
+        self.objective_ = float(local_hist_obj[-1]) if local_hist_obj else float("nan")
+        self.graph_laplacian_ = L
+        self.history_["objective_history"] = local_hist_obj
+        self.history_["step_size_history"] = local_hist_step
+        self.history_["rel_change_history"] = local_hist_rel
+        return self

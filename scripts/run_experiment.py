@@ -58,6 +58,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--n-repeats", type=int, default=3, help="Independent repeats.")
     parser.add_argument(
+        "--n-components",
+        type=int,
+        default=1,
+        help="Number of components for each method.",
+    )
+    parser.add_argument(
         "--lambda1", type=float, default=0.15, help="L1 sparsity level."
     )
     parser.add_argument(
@@ -65,6 +71,17 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--max-iter", type=int, default=400, help="Max iterations.")
     parser.add_argument("--seed", type=int, default=42, help="Base random seed.")
+    parser.add_argument(
+        "--graph-misspec-rate",
+        type=float,
+        default=None,
+        help="Optional synthetic-graph perturbation rate in [0, 1].",
+    )
+    parser.add_argument(
+        "--include-stiefel-manifold",
+        action="store_true",
+        help="Include NetSPCA manifold multi-component baseline.",
+    )
     parser.add_argument(
         "--dataset",
         type=str,
@@ -93,11 +110,16 @@ def main() -> None:
     if args.dataset == "synthetic":
         cfg = _load_config(args.config)
         cfg.random_state = args.seed
+        cfg.n_components = args.n_components
+        if args.graph_misspec_rate is not None:
+            cfg.graph_misspec_rate = float(args.graph_misspec_rate)
         methods = build_baselines(
             lambda1=args.lambda1,
             lambda2=args.lambda2,
             max_iter=args.max_iter,
             random_state=args.seed,
+            n_components=args.n_components,
+            include_stiefel_manifold=args.include_stiefel_manifold,
         )
         records = run_repeated_benchmark(
             cfg=cfg,
@@ -110,6 +132,7 @@ def main() -> None:
     else:
         cfg_real = RealBenchmarkConfig(
             dataset=args.dataset,
+            n_components=args.n_components,
             lambda1=args.lambda1,
             lambda2=args.lambda2,
             max_iter=args.max_iter,

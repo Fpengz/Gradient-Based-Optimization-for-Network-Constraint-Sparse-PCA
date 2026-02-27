@@ -79,6 +79,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=str, default="results")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--n-repeats", type=int, default=2)
+    parser.add_argument("--n-components", type=int, default=1)
     parser.add_argument("--max-iter", type=int, default=400)
     parser.add_argument("--lambda1-grid", type=str, default="0.01,0.05,0.1,0.2,0.5")
     parser.add_argument("--lambda2-grid", type=str, default="0.0,0.01,0.05,0.1,0.5,1.0")
@@ -87,6 +88,12 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Optional JSON config matching SyntheticBenchmarkConfig.",
+    )
+    parser.add_argument(
+        "--graph-misspec-rate",
+        type=float,
+        default=None,
+        help="Optional synthetic-graph perturbation rate in [0, 1].",
     )
     return parser.parse_args()
 
@@ -106,6 +113,9 @@ def main() -> None:
     lambda1_grid = _parse_float_list(args.lambda1_grid)
     lambda2_grid = _parse_float_list(args.lambda2_grid)
     cfg = _load_config(args.config, args.seed)
+    cfg.n_components = args.n_components
+    if args.graph_misspec_rate is not None:
+        cfg.graph_misspec_rate = float(args.graph_misspec_rate)
 
     all_records: list[dict[str, Any]] = []
     for lambda1 in lambda1_grid:
@@ -115,6 +125,7 @@ def main() -> None:
                 lambda2=lambda2,
                 max_iter=args.max_iter,
                 random_state=args.seed,
+                n_components=args.n_components,
             )
             methods = {
                 "NetSPCA-PG": methods["NetSPCA-PG"],

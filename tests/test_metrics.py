@@ -6,6 +6,7 @@ from src.utils.metrics import (
     explained_variance,
     laplacian_energy,
     support_metrics,
+    topk_support_metrics,
 )
 
 
@@ -35,3 +36,12 @@ def test_explained_variance_scalar():
     w = np.array([1.0, 0.0])
     val = explained_variance(X, w, centered=True)
     assert val >= 0.0
+
+
+def test_topk_support_metrics_uses_strongest_entries():
+    w = np.array([0.9, 0.8, 0.05, 0.0, -0.7, 0.1])
+    true_support = np.array([0, 1, 4])
+    metrics = topk_support_metrics(w, true_support=true_support, k=3)
+    assert np.isclose(metrics["precision"], 1.0)
+    assert np.isclose(metrics["recall"], 1.0)
+    assert np.isclose(metrics["f1"], 1.0)
