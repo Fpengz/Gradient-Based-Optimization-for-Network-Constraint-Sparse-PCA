@@ -25,19 +25,26 @@ This project uses `uv` for modern, fast Python package management.
 
 ### Running Benchmarks
 
-We provide several reproducible benchmarks from seminal papers:
+*   **Core synthetic comparison suite (paper baseline set):**
+    ```bash
+    uv run python scripts/run_experiment.py --n-repeats 3
+    ```
+    This runs: `PCA`, `L1-SPCA-ProxGrad`, `Graph-PCA`, `NetSPCA-PG`, `NetSPCA-MASPG-CAR`, `GPower`, and `ElasticNet-SPCA`.
 
-*   **General Comparison**: Compare all implemented models on synthetic data.
+*   **Hyperparameter sweeps (`\lambda_1`, `\lambda_2`) with plots + LaTeX tables:**
     ```bash
-    uv run experiments/benchmark_comparison.py
+    uv run python scripts/run_sweep.py --n-repeats 2
     ```
-*   **Biological Data (p=2000)**: Run the Alon et al. Colon Cancer benchmark.
+
+*   **Real dataset comparison (Colon / Pitprop):**
     ```bash
-    export PYTHONPATH=$PYTHONPATH:. && uv run experiments/colon_benchmark.py
+    uv run python scripts/run_experiment.py --dataset colon
+    uv run python scripts/run_experiment.py --dataset pitprop
     ```
-*   **Graph-Structured Data**: Test NC-SPCA on Chain and Grid feature networks.
+
+*   **One-command figure reproduction bundle:**
     ```bash
-    export PYTHONPATH=$PYTHONPATH:. && uv run experiments/nc_spca_benchmark.py
+    uv run python scripts/reproduce_figures.py
     ```
 
 ---
@@ -48,8 +55,7 @@ We provide several reproducible benchmarks from seminal papers:
 | :--- | :--- | :--- |
 | **Zou SPCA** | Elastic Net / Regression | Zou et al. (2006) |
 | **GPM** | Generalized Power Method | Journée et al. (2010) |
-| **GradFPS** | Fantope Projection / Proximal Grad | Qiu et al. (2023) |
-| **NC-SPCA** | Laplacian Regularization / Proximal Grad | *Wang Zhoufu (2026)* |
+| **NC-SPCA** | Laplacian Regularization / Proximal Grad | Wang Zhoufu (2026) |
 
 ---
 
@@ -57,18 +63,27 @@ We provide several reproducible benchmarks from seminal papers:
 
 1.  **Pitprop Dataset**: 13x13 correlation matrix of physical timber properties (Jeffers 1967).
 2.  **Colon Cancer**: Gene expression data (2000 genes, 62 samples) from Alon et al. (1999).
-3.  **Zou Example 1**: 10-variable synthetic model with 3 hidden factors.
-4.  **High-Dim Spiked Model**: $p=500, n=200$ model for subspace recovery tests.
-5.  **Graph Synthesis**: Generators for **Chain, Grid, Random Geometric (RGG), and Stochastic Block (SBM)** feature graphs.
+3.  **Graph-Structured Synthetic Data**: configurable generators for **Chain, Grid, ER, and SBM** feature graphs with connected sparse supports.
 
 ---
 
 ## 📂 Project Structure
 
 *   `src/models/`: Implementation of SPCA variants.
-*   `data/`: Data loaders and synthetic generators.
-*   `experiments/`: Benchmark and replication scripts.
+*   `src/experiments/`: Reusable synthetic benchmark and comparison utilities.
+*   `data/`: Data loaders.
+*   `scripts/`: Reproducible experiment/sweep runners.
 *   `doc/`: Theoretical documentation, derivations, and publication drafts.
+
+---
+
+## ✅ CI
+
+CI is configured in `.github/workflows/ci.yml` and runs:
+
+- `uv run ruff check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests`
+- `uv run black --check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests`
+- `uv run pytest -q`
 
 ---
 

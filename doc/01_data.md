@@ -16,7 +16,7 @@ This project utilizes a mix of classic statistical benchmarks, real-world biolog
 - **Description**: 10 variables with 3 underlying hidden factors. Features $X_1-X_4$ depend on Factor 1, $X_5-X_8$ on Factor 2, and $X_9-X_{10}$ on Factor 3.
 - **Source**: Zou, Hastie, & Tibshirani (2006).
 - **Purpose**: Verify that the SPCA algorithm can isolate the primary sparse loadings (e.g., $X_1-X_4$ for PC1).
-- **Location**: `data/synthetic/synthetic_data.py` (`generate_zou_example_1`)
+- **Location**: generated through the unified synthetic benchmark in `src/experiments/synthetic_benchmark.py`
 
 ---
 
@@ -26,7 +26,7 @@ This project utilizes a mix of classic statistical benchmarks, real-world biolog
 - **Description**: Gene expression data for 2000 genes across 62 samples (40 tumor, 22 normal tissues).
 - **Source**: Alon et al. (1999); sourced via the `alxiang/Colon-Cancer-Classification` repository.
 - **Purpose**: High-dimensional ($p \gg n$) feature selection benchmark for biological interpretability.
-- **Location**: `data/colon_x.csv` (Raw data), `experiments/colon_benchmark.py` (Preprocessing & Test).
+- **Location**: `data/colon_x.csv` (raw data), benchmarked through `scripts/run_experiment.py --dataset colon`.
 
 ---
 
@@ -36,7 +36,7 @@ This project utilizes a mix of classic statistical benchmarks, real-world biolog
 - **Description**: $p=500, n=200$. The covariance matrix $\Sigma$ is constructed with two sparse dominant eigenvectors (spikes).
 - **Source**: Qiu, Lei, & Roeder (2023).
 - **Purpose**: Evaluate **subspace recovery** accuracy (subspace distance) in high-dimensional settings where standard PCA is inconsistent.
-- **Location**: `data/synthetic/qiu_synthetic.py`
+- **Location**: configurable through `src/experiments/synthetic_benchmark.py`.
 
 ---
 
@@ -54,7 +54,7 @@ For **Network-Constrained SPCA**, we generate data where the sparse support is a
 1. Construct Laplacian $L$ for the chosen graph.
 2. Select a connected subgraph as the ground truth support $S^\star$.
 3. Generate data $X$ using a spiked covariance model with support $S^\star$.
-- **Location**: `data/synthetic/graph_data.py`
+- **Location**: `src/experiments/synthetic_benchmark.py`
 
 ---
 
