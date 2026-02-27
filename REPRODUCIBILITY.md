@@ -3,7 +3,7 @@
 ## Environment
 
 ```bash
-uv sync
+uv sync --dev
 ```
 
 ## Deterministic runs
@@ -29,6 +29,38 @@ Artifacts are written to `results/synth-comparison-<timestamp>/`:
 - `records.json` / `records.csv`
 - `summary.csv`
 - `summary_table.tex`
+
+Recorded metrics include:
+
+- explained variance
+- support precision/recall/F1
+- top-k precision/recall/F1 (`k = |S*|`)
+- LCC ratio
+- Laplacian energy
+- runtime / convergence
+
+## Graph misspecification robustness
+
+```bash
+uv run python scripts/run_experiment.py \
+  --dataset synthetic \
+  --graph-misspec-rate 0.15 \
+  --n-repeats 3 \
+  --seed 42
+```
+
+This perturbs the estimator graph (not the data-generating covariance) and logs `graph_misspec_rate` in outputs.
+
+## Multi-component manifold benchmark
+
+```bash
+uv run python scripts/run_experiment.py \
+  --dataset synthetic \
+  --n-components 3 \
+  --include-stiefel-manifold \
+  --n-repeats 3 \
+  --seed 42
+```
 
 ## Real dataset runs
 
@@ -63,6 +95,12 @@ Artifacts are written to `results/synth-sweep-<timestamp>/`:
 - `variance_vs_sparsity.png`
 - `connectivity_vs_lambda2.png`
 
+Optional robustness sweep:
+
+```bash
+uv run python scripts/run_sweep.py --graph-misspec-rate 0.1 --n-repeats 2 --seed 42
+```
+
 ## One-command bundle
 
 ```bash
@@ -74,6 +112,7 @@ This executes synthetic comparison, synthetic sweep, and colon comparison in seq
 ## Validation checks
 
 ```bash
+uv run ty check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests
 uv run pytest -q
 uv run ruff check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests
 uv run black --check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests

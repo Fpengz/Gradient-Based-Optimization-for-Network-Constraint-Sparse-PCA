@@ -22,6 +22,10 @@ This project uses `uv` for modern, fast Python package management.
     ```bash
     uv sync
     ```
+    For development checks (`ty`, `ruff`, `pytest`, `black`), use:
+    ```bash
+    uv sync --dev
+    ```
 
 ### Running Benchmarks
 

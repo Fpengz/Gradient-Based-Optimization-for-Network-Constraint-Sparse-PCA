@@ -67,3 +67,27 @@ To help adhere to this standard, you can configure git to use the provided templ
 ```bash
 git config commit.template .gitmessage
 ```
+
+## Local Quality Gates
+
+Install dependencies and local hooks:
+
+```bash
+uv sync --dev
+bash scripts/install_git_hooks.sh
+```
+
+Pre-commit runs the project checks on every commit:
+
+- `uv run ty check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests`
+- `uv run ruff check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests`
+- `uv run pytest -q`
+
+Manual full gate (matches CI + hook union):
+
+```bash
+uv run ty check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests
+uv run ruff check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests
+uv run black --check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests
+uv run pytest -q
+```

@@ -11,9 +11,11 @@ notebooks/.ipynb_checkpoints/
 .pytest_cache
 .coverage
 .pytest_cov
+.pyrefly/
 
 # Virtual environments
 .venv
+.uv-cache/
 
 # LaTeX compiled files
 *.aux
@@ -28,3 +30,8 @@ notebooks/.ipynb_checkpoints/
 
 # IDE and editor files
 .idea/
+.vscode/
+.DS_Store
+
+# Experiment artifacts
+results/
