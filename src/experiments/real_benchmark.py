@@ -30,6 +30,9 @@ class RealBenchmarkConfig:
     lambda2: float = 0.25
     max_iter: int = 400
     random_state: int = 42
+    backend: str = "numpy"
+    torch_device: str = "cpu"
+    torch_dtype: str = "float64"
     graph_type: str = "chain"
     knn_k: int = 8
     support_threshold: float = 1e-6
@@ -85,6 +88,9 @@ def run_real_benchmark(cfg: RealBenchmarkConfig) -> list[dict[str, Any]]:
         max_iter=cfg.max_iter,
         random_state=cfg.random_state,
         n_components=cfg.n_components,
+        backend=cfg.backend,
+        torch_device=cfg.torch_device,
+        torch_dtype=cfg.torch_dtype,
     )
 
     records: list[dict[str, Any]] = []

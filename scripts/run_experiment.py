@@ -83,6 +83,26 @@ def parse_args() -> argparse.Namespace:
         help="Include NetSPCA manifold multi-component baseline.",
     )
     parser.add_argument(
+        "--backend",
+        type=str,
+        default="numpy",
+        choices=["numpy", "torch", "torch-geoopt"],
+        help="Backend for graph-constrained methods.",
+    )
+    parser.add_argument(
+        "--torch-device",
+        type=str,
+        default="cpu",
+        help="Torch device when --backend is torch or torch-geoopt.",
+    )
+    parser.add_argument(
+        "--torch-dtype",
+        type=str,
+        default="float64",
+        choices=["float32", "float64"],
+        help="Torch dtype when --backend is torch or torch-geoopt.",
+    )
+    parser.add_argument(
         "--dataset",
         type=str,
         default="synthetic",
@@ -120,6 +140,9 @@ def main() -> None:
             random_state=args.seed,
             n_components=args.n_components,
             include_stiefel_manifold=args.include_stiefel_manifold,
+            backend=args.backend,
+            torch_device=args.torch_device,
+            torch_dtype=args.torch_dtype,
         )
         records = run_repeated_benchmark(
             cfg=cfg,
@@ -137,6 +160,9 @@ def main() -> None:
             lambda2=args.lambda2,
             max_iter=args.max_iter,
             random_state=args.seed,
+            backend=args.backend,
+            torch_device=args.torch_device,
+            torch_dtype=args.torch_dtype,
             graph_type=args.graph_type_real,
             knn_k=args.knn_k,
         )

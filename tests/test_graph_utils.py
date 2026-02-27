@@ -1,6 +1,12 @@
 import numpy as np
 
-from src.utils.graph import adjacency_to_laplacian, chain_graph, grid_graph, sbm_graph
+from src.utils.graph import (
+    adjacency_to_laplacian,
+    chain_graph,
+    grid_graph,
+    random_geometric_graph,
+    sbm_graph,
+)
 
 
 def test_chain_graph_laplacian_is_symmetric_psd():
@@ -24,3 +30,15 @@ def test_symmetric_normalized_laplacian_shape():
     L = adjacency_to_laplacian(graph.adjacency, laplacian_type="sym_norm").toarray()
     assert L.shape == (8, 8)
     assert np.allclose(L, L.T, atol=1e-10)
+
+
+def test_random_geometric_graph_properties():
+    graph = random_geometric_graph(
+        n_nodes=20, radius=0.35, random_state=2, laplacian_type="unnormalized"
+    )
+    A = graph.adjacency.toarray()
+    L = graph.laplacian.toarray()
+    assert A.shape == (20, 20)
+    assert np.allclose(A, A.T)
+    assert np.allclose(np.diag(A), 0.0)
+    assert np.allclose(L, L.T)

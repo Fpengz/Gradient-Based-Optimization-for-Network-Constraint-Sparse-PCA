@@ -26,6 +26,20 @@ def test_generate_graph_structured_data_shapes():
     assert sample["graph"].laplacian.shape == (25, 25)
 
 
+def test_generate_graph_structured_data_rgg():
+    cfg = SyntheticBenchmarkConfig(
+        n_samples=24,
+        n_features=16,
+        support_size=4,
+        graph_type="rgg",
+        graph_rgg_radius=0.4,
+        random_state=9,
+    )
+    sample = generate_graph_structured_data(cfg)
+    assert sample["X"].shape == (24, 16)
+    assert sample["graph"].adjacency.shape == (16, 16)
+
+
 def test_run_benchmark_once_returns_expected_metrics():
     cfg = SyntheticBenchmarkConfig(
         n_samples=40, n_features=20, support_size=5, random_state=1
@@ -119,3 +133,28 @@ def test_build_baselines_can_include_stiefel_solver():
         include_stiefel_manifold=True,
     )
     assert "NetSPCA-Stiefel" in methods
+
+
+def test_build_baselines_torch_backend_wiring():
+    methods = build_baselines(
+        lambda1=0.1,
+        lambda2=0.2,
+        max_iter=20,
+        random_state=0,
+        n_components=1,
+        backend="torch",
+    )
+    assert type(methods["NetSPCA-PG"]).__name__ == "TorchNetworkSparsePCA"
+
+
+def test_build_baselines_torch_geoopt_stiefel_wiring():
+    methods = build_baselines(
+        lambda1=0.1,
+        lambda2=0.2,
+        max_iter=20,
+        random_state=0,
+        n_components=2,
+        include_stiefel_manifold=True,
+        backend="torch-geoopt",
+    )
+    assert type(methods["NetSPCA-Stiefel"]).__name__ == "TorchNetworkSparsePCA_GeooptStiefel"

@@ -18,6 +18,8 @@ from src.models import (
     NetworkSparsePCA_MASPG_CAR,
     PCAEstimator,
     SparsePCA_L1_ProxGrad,
+    TorchNetworkSparsePCA,
+    TorchNetworkSparsePCA_GeooptStiefel,
     ZouSparsePCA,
 )
 from src.utils.graph import (
@@ -26,6 +28,7 @@ from src.utils.graph import (
     chain_graph,
     er_graph,
     grid_graph,
+    random_geometric_graph,
     sbm_graph,
 )
 from src.utils.metrics import (
@@ -49,6 +52,7 @@ class SyntheticBenchmarkConfig:
     graph_type: str = "chain"
     graph_laplacian_type: str = "unnormalized"
     graph_er_p: float = 0.08
+    graph_rgg_radius: float = 0.18
     graph_sbm_p_in: float = 0.25
     graph_sbm_p_out: float = 0.02
     support_threshold: float = 1e-6
@@ -75,6 +79,14 @@ def _build_graph(cfg: SyntheticBenchmarkConfig, rng: np.random.Generator) -> Gra
         return er_graph(
             cfg.n_features,
             p_edge=cfg.graph_er_p,
+            random_state=seed,
+            laplacian_type=cfg.graph_laplacian_type,
+        )
+    if cfg.graph_type == "rgg":
+        seed = int(rng.integers(0, 2**31 - 1))
+        return random_geometric_graph(
+            cfg.n_features,
+            radius=cfg.graph_rgg_radius,
             random_state=seed,
             laplacian_type=cfg.graph_laplacian_type,
         )
@@ -209,6 +221,30 @@ def _safe_scalar(value: Any) -> float | int | None:
     return None
 
 
+def _curve_from_history(model: Any, key: str) -> list[float]:
+    hist = getattr(model, "history_", {})
+    if not isinstance(hist, dict):
+        return []
+    raw = hist.get(key, [])
+    if not raw:
+        return []
+    if isinstance(raw, list) and raw and isinstance(raw[0], list):
+        vals = raw[0]
+    elif isinstance(raw, list):
+        vals = raw
+    else:
+        return []
+    out: list[float] = []
+    for v in vals:
+        try:
+            fv = float(v)
+        except (TypeError, ValueError):
+            continue
+        if np.isfinite(fv):
+            out.append(fv)
+    return out
+
+
 def _first_component(model: Any) -> np.ndarray:
     comp = np.asarray(model.components_, dtype=float)
     if comp.ndim != 2 or comp.shape[0] == 0:
@@ -250,8 +286,70 @@ def build_baselines(
     random_state: int = 0,
     n_components: int = 1,
     include_stiefel_manifold: bool = False,
+    backend: str = "numpy",
+    torch_device: str = "cpu",
+    torch_dtype: str = "float64",
 ) -> dict[str, Any]:
     """Build a targeted comparison set spanning sparsity/graph/optimizer axes."""
+    if backend not in {"numpy", "torch", "torch-geoopt"}:
+        raise ValueError(f"Unsupported backend={backend!r}.")
+
+    if backend == "numpy":
+        graph_pca = NetworkSparsePCA(
+            n_components=n_components,
+            lambda1=0.0,
+            lambda2=lambda2,
+            max_iter=max_iter,
+            algorithm="pg",
+            random_state=random_state,
+        )
+        net_pg = NetworkSparsePCA(
+            n_components=n_components,
+            lambda1=lambda1,
+            lambda2=lambda2,
+            max_iter=max_iter,
+            algorithm="pg",
+            random_state=random_state,
+        )
+        net_maspg = NetworkSparsePCA_MASPG_CAR(
+            n_components=n_components,
+            lambda1=lambda1,
+            lambda2=lambda2,
+            max_iter=max_iter,
+            random_state=random_state,
+        )
+    else:
+        graph_pca = TorchNetworkSparsePCA(
+            n_components=n_components,
+            lambda1=0.0,
+            lambda2=lambda2,
+            max_iter=max_iter,
+            backend="pg",
+            random_state=random_state,
+            device=torch_device,
+            dtype=torch_dtype,
+        )
+        net_pg = TorchNetworkSparsePCA(
+            n_components=n_components,
+            lambda1=lambda1,
+            lambda2=lambda2,
+            max_iter=max_iter,
+            backend="pg",
+            random_state=random_state,
+            device=torch_device,
+            dtype=torch_dtype,
+        )
+        net_maspg = TorchNetworkSparsePCA(
+            n_components=n_components,
+            lambda1=lambda1,
+            lambda2=lambda2,
+            max_iter=max_iter,
+            backend="maspg_car",
+            random_state=random_state,
+            device=torch_device,
+            dtype=torch_dtype,
+        )
+
     baselines: dict[str, Any] = {
         "PCA": PCAEstimator(n_components=n_components),
         "L1-SPCA-ProxGrad": SparsePCA_L1_ProxGrad(
@@ -260,29 +358,9 @@ def build_baselines(
             max_iter=max_iter,
             monotone_backtracking=True,
         ),
-        "Graph-PCA": NetworkSparsePCA(
-            n_components=n_components,
-            lambda1=0.0,
-            lambda2=lambda2,
-            max_iter=max_iter,
-            algorithm="pg",
-            random_state=random_state,
-        ),
-        "NetSPCA-PG": NetworkSparsePCA(
-            n_components=n_components,
-            lambda1=lambda1,
-            lambda2=lambda2,
-            max_iter=max_iter,
-            algorithm="pg",
-            random_state=random_state,
-        ),
-        "NetSPCA-MASPG-CAR": NetworkSparsePCA_MASPG_CAR(
-            n_components=n_components,
-            lambda1=lambda1,
-            lambda2=lambda2,
-            max_iter=max_iter,
-            random_state=random_state,
-        ),
+        "Graph-PCA": graph_pca,
+        "NetSPCA-PG": net_pg,
+        "NetSPCA-MASPG-CAR": net_maspg,
         "GPower": GeneralizedPowerMethod(
             n_components=n_components,
             gamma=lambda1,
@@ -296,13 +374,35 @@ def build_baselines(
         ),
     }
     if include_stiefel_manifold:
-        baselines["NetSPCA-Stiefel"] = NetworkSparsePCA_StiefelManifold(
-            n_components=n_components,
-            lambda1=lambda1,
-            lambda2=lambda2,
-            max_iter=max_iter,
-            random_state=random_state,
-        )
+        if backend == "numpy":
+            baselines["NetSPCA-Stiefel"] = NetworkSparsePCA_StiefelManifold(
+                n_components=n_components,
+                lambda1=lambda1,
+                lambda2=lambda2,
+                max_iter=max_iter,
+                random_state=random_state,
+            )
+        elif backend == "torch-geoopt":
+            baselines["NetSPCA-Stiefel"] = TorchNetworkSparsePCA_GeooptStiefel(
+                n_components=n_components,
+                lambda1=lambda1,
+                lambda2=lambda2,
+                max_iter=max_iter,
+                random_state=random_state,
+                device=torch_device,
+                dtype=torch_dtype,
+            )
+        else:
+            baselines["NetSPCA-Stiefel"] = TorchNetworkSparsePCA(
+                n_components=n_components,
+                lambda1=lambda1,
+                lambda2=lambda2,
+                max_iter=max_iter,
+                backend="pg",
+                random_state=random_state,
+                device=torch_device,
+                dtype=torch_dtype,
+            )
     return baselines
 
 
@@ -367,6 +467,18 @@ def run_benchmark_once(
             "converged": bool(getattr(estimator, "converged_", False)),
             "n_iter": _safe_scalar(getattr(estimator, "n_iter_", None)),
             "objective": _safe_scalar(getattr(estimator, "objective_", None)),
+            "objective_curve": _curve_from_history(
+                estimator, "objective_history_by_component"
+            ),
+            "step_size_curve": _curve_from_history(
+                estimator, "step_size_history_by_component"
+            ),
+            "rel_change_curve": _curve_from_history(
+                estimator, "rel_change_history_by_component"
+            ),
+            "pg_residual_curve": _curve_from_history(
+                estimator, "pg_residual_history_by_component"
+            ),
         }
         records.append(record)
 

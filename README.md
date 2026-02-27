@@ -27,6 +27,11 @@ This project uses `uv` for modern, fast Python package management.
     uv sync --dev
     ```
 
+3.  **Optional Torch backend dependencies** (only if you want PyTorch/Geoopt models):
+    ```bash
+    pip install torch geoopt
+    ```
+
 ### Running Benchmarks
 
 *   **Core synthetic comparison suite (paper baseline set):**
@@ -34,6 +39,16 @@ This project uses `uv` for modern, fast Python package management.
     uv run python scripts/run_experiment.py --n-repeats 3
     ```
     This runs: `PCA`, `L1-SPCA-ProxGrad`, `Graph-PCA`, `NetSPCA-PG`, `NetSPCA-MASPG-CAR`, `GPower`, and `ElasticNet-SPCA`.
+
+*   **Run graph methods with Torch backend:**
+    ```bash
+    uv run python scripts/run_experiment.py --backend torch --n-repeats 3
+    ```
+
+*   **Run manifold baseline with Torch+Geoopt:**
+    ```bash
+    uv run python scripts/run_experiment.py --backend torch-geoopt --include-stiefel-manifold --n-components 3 --n-repeats 3
+    ```
 
 *   **Stress graph misspecification (graph-quality robustness):**
     ```bash
@@ -71,6 +86,8 @@ This project uses `uv` for modern, fast Python package management.
 | **GPM** | Generalized Power Method | Journée et al. (2010) |
 | **NC-SPCA** | Laplacian Regularization / Proximal Grad | Wang Zhoufu (2026) |
 | **NC-SPCA (Stiefel)** | Manifold proximal gradient + Stiefel retraction | Chen et al. (ManPG lineage) |
+| **NC-SPCA (Torch)** | PyTorch PG/MASPG-CAR backend | This repository |
+| **NC-SPCA (Torch + Geoopt)** | Geoopt Stiefel manifold backend | This repository |
 
 ---
 
@@ -78,7 +95,7 @@ This project uses `uv` for modern, fast Python package management.
 
 1.  **Pitprop Dataset**: 13x13 correlation matrix of physical timber properties (Jeffers 1967).
 2.  **Colon Cancer**: Gene expression data (2000 genes, 62 samples) from Alon et al. (1999).
-3.  **Graph-Structured Synthetic Data**: configurable generators for **Chain, Grid, ER, and SBM** feature graphs with connected sparse supports.
+3.  **Graph-Structured Synthetic Data**: configurable generators for **Chain, Grid, ER, RGG, and SBM** feature graphs with connected sparse supports.
 
 ---
 
@@ -125,6 +142,11 @@ $$ \min_{\|w\|_2 \le 1} -w^\top \hat\Sigma w + \lambda_1 \|w\|_1 + \lambda_2 w^\
 This encourages the selection of **connected, smooth supports** on the feature network, leading to more scientifically valid factor discovery.
 
 For regularization-path workflows, `NetworkSparsePCA.fit_path(...)` provides warm-start continuation across `lambda1`/`lambda2` grids.
+
+Torch side-by-side backends are available as:
+
+- `TorchNetworkSparsePCA` (single-component PG/MASPG-CAR style)
+- `TorchNetworkSparsePCA_GeooptStiefel` (multi-component Stiefel manifold)
 
 ---
 

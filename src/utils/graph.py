@@ -117,6 +117,30 @@ def er_graph(
     )
 
 
+def random_geometric_graph(
+    n_nodes: int,
+    radius: float,
+    random_state: int | None = None,
+    laplacian_type: str = "unnormalized",
+) -> GraphData:
+    """Build an undirected random geometric graph in 2D."""
+    if n_nodes <= 0:
+        raise ValueError("n_nodes must be positive")
+    if radius <= 0:
+        raise ValueError("radius must be positive")
+    rng = np.random.default_rng(random_state)
+    coords = rng.uniform(size=(n_nodes, 2))
+    diff = coords[:, None, :] - coords[None, :, :]
+    dist = np.sqrt(np.sum(diff * diff, axis=2))
+    mask = (dist <= radius) & (~np.eye(n_nodes, dtype=bool))
+    A = sp.csr_matrix(mask.astype(float))
+    return _package_graph(
+        A,
+        laplacian_type,
+        {"family": "rgg", "n_nodes": n_nodes, "radius": float(radius)},
+    )
+
+
 def sbm_graph(
     block_sizes: list[int] | tuple[int, ...],
     p_in: float,

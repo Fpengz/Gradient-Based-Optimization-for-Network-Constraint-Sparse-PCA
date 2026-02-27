@@ -43,6 +43,20 @@
 - Repeated trials with controlled seeds.
 - All methods run via the same benchmark harness and logging schema.
 
+## Recommended defaults (audit-backed)
+
+- Start grid:
+  - `lambda1`: `0.1, 0.15, 0.2, 0.3`
+  - `lambda2`: `0.05, 0.1, 0.2, 0.25`
+- Use `NetworkSparsePCA.fit_path(...)` for continuation warm starts when scanning `(lambda1, lambda2)`.
+- Prefer:
+  - `NetSPCA-PG` for theorem-aligned convergence analysis.
+  - `NetSPCA-MASPG-CAR` for practical iteration/runtime reduction.
+- Track all of:
+  - `objective_curve`
+  - `pg_residual_curve`
+  - `rel_change_curve`
+
 ## Outputs for paper writing
 
 - CSV summaries for tables.

@@ -7,6 +7,7 @@ from .graph import (
     er_graph,
     grid_graph,
     knn_graph,
+    random_geometric_graph,
     sbm_graph,
 )
 from .metrics import (
@@ -24,6 +25,7 @@ __all__ = [
     "er_graph",
     "grid_graph",
     "knn_graph",
+    "random_geometric_graph",
     "sbm_graph",
     "connected_support_lcc_ratio",
     "explained_variance",

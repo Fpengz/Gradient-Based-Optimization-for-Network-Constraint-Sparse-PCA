@@ -7,6 +7,8 @@ from src.models import (
     NetworkSparsePCA_MASPG_CAR,
     PCAEstimator,
     SparsePCA_L1_ProxGrad,
+    TorchNetworkSparsePCA,
+    TorchNetworkSparsePCA_GeooptStiefel,
     ZouSparsePCA,
 )
 from src.utils.graph import chain_graph
@@ -65,6 +67,9 @@ def test_network_sparse_pca_pg_and_maspg_api():
     for model in (pg, maspg):
         _assert_common_attrs(model)
         assert model.components_.shape == (1, 10)
+        hist = model.history_
+        assert "pg_residual_history_by_component" in hist
+        assert len(hist["pg_residual_history_by_component"]) == 1
 
 
 def test_network_sparse_pca_handles_disconnected_graph():
@@ -109,3 +114,38 @@ def test_network_sparse_pca_fit_path_returns_warm_started_models():
     assert all("lambda1" in row and "lambda2" in row for row in path)
     assert all("model" in row for row in path)
     assert all(path[i]["warm_started"] for i in range(1, len(path)))
+
+
+def test_torch_network_sparse_pca_api_if_torch_available():
+    pytest = __import__("pytest")
+    pytest.importorskip("torch")
+    X = _toy_data()
+    graph = chain_graph(X.shape[1])
+    model = TorchNetworkSparsePCA(
+        n_components=1,
+        max_iter=25,
+        tol=1e-4,
+        random_state=0,
+        backend="pg",
+    ).fit(X, graph=graph)
+    _assert_common_attrs(model)
+    assert model.components_.shape == (1, 10)
+    assert "pg_residual_history_by_component" in model.history_
+
+
+def test_torch_geoopt_stiefel_api_if_geoopt_available():
+    pytest = __import__("pytest")
+    pytest.importorskip("torch")
+    pytest.importorskip("geoopt")
+    X = _toy_data()
+    graph = chain_graph(X.shape[1])
+    model = TorchNetworkSparsePCA_GeooptStiefel(
+        n_components=2,
+        max_iter=25,
+        tol=1e-4,
+        random_state=0,
+    ).fit(X, graph=graph)
+    _assert_common_attrs(model)
+    assert model.components_.shape == (2, 10)
+    gram = model.components_ @ model.components_.T
+    assert np.allclose(gram, np.eye(2), atol=1e-2)

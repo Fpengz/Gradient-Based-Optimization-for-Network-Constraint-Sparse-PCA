@@ -150,6 +150,22 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             return float("inf")
         return value
 
+    def _smooth_value(
+        self, Xc: np.ndarray, w: np.ndarray, L: sp.spmatrix | np.ndarray
+    ) -> float:
+        n = Xc.shape[0]
+        with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+            sigma_term = -(w @ (Xc.T @ (Xc @ w))) / n
+        if sp.issparse(L):
+            with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+                lap = float(w @ (L @ w))
+        else:
+            L_dense = np.asarray(L, dtype=float)
+            with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+                lap = float(w @ (L_dense @ w))
+        value = float(sigma_term + self.lambda2 * lap)
+        return value if np.isfinite(value) else float("inf")
+
     def _initialize_component(
         self, Xc: np.ndarray, rng: np.random.Generator
     ) -> np.ndarray:
@@ -170,6 +186,7 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         y: np.ndarray,
         L: sp.spmatrix | np.ndarray,
         eta: float,
+        use_smooth_majorization: bool = False,
     ) -> tuple[np.ndarray, float, np.ndarray]:
         grad = self._smooth_grad(Xc, y, L)
         eta_trial = eta
@@ -181,12 +198,26 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
                 return np.zeros_like(y), eta_trial, grad
             if not self.monotone_backtracking:
                 return w_trial, eta_trial, grad
-            f_y = self._objective(Xc, y, L)
-            f_trial = self._objective(Xc, w_trial, L)
-            if not np.isfinite(f_y) or not np.isfinite(f_trial):
+            if use_smooth_majorization:
+                f_y = self._smooth_value(Xc, y, L)
+                f_trial = self._smooth_value(Xc, w_trial, L)
+                quad = float(
+                    np.dot(grad, (w_trial - y))
+                    + (0.5 / eta_trial) * np.linalg.norm(w_trial - y) ** 2
+                )
+                if not np.isfinite(f_y) or not np.isfinite(f_trial) or not np.isfinite(quad):
+                    return np.zeros_like(y), eta_trial, grad
+                if f_trial <= f_y + quad + 1e-12 or eta_trial < 1e-16:
+                    return w_trial, eta_trial, grad
+            else:
+                f_y = self._objective(Xc, y, L)
+                f_trial = self._objective(Xc, w_trial, L)
+                if not np.isfinite(f_y) or not np.isfinite(f_trial):
+                    return np.zeros_like(y), eta_trial, grad
+                if f_trial <= f_y + 1e-12 or eta_trial < 1e-16:
+                    return w_trial, eta_trial, grad
+            if eta_trial < 1e-16:
                 return np.zeros_like(y), eta_trial, grad
-            if f_trial <= f_y + 1e-12 or eta_trial < 1e-16:
-                return w_trial, eta_trial, grad
             eta_trial *= 0.5
 
     def _fit_one_component(
@@ -210,6 +241,7 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             "objective": [],
             "step_size": [],
             "rel_change": [],
+            "pg_residual": [],
         }
         support_history: list[tuple[int, ...]] = []
         converged = False
@@ -241,14 +273,26 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             if not np.all(np.isfinite(y)):
                 return np.zeros_like(w), local_history, False, it + 1
 
-            w_trial, eta, _ = self._accept_with_backtracking(Xc, y, L, eta)
+            w_trial, eta, _ = self._accept_with_backtracking(
+                Xc,
+                y,
+                L,
+                eta,
+                use_smooth_majorization=(self.algorithm == "maspg_car"),
+            )
 
             if self.algorithm == "maspg_car" and self.monotone_backtracking:
                 obj_old = self._objective(Xc, w, L)
                 obj_trial = self._objective(Xc, w_trial, L)
                 if obj_trial > obj_old + 1e-12:
                     # Restart: drop inertia and recompute from current iterate.
-                    w_trial, eta, _ = self._accept_with_backtracking(Xc, w, L, eta)
+                    w_trial, eta, _ = self._accept_with_backtracking(
+                        Xc,
+                        w,
+                        L,
+                        eta,
+                        use_smooth_majorization=(self.algorithm == "maspg_car"),
+                    )
             w_prev = w_old
             grad_prev = grad_old
             w = w_trial
@@ -260,9 +304,13 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
                 if prev_obj is not None and np.isfinite(prev_obj)
                 else np.inf
             )
+            residual = float(
+                np.linalg.norm((y - w_trial) / max(eta, 1e-12))
+            )
             local_history["objective"].append(float(obj))
             local_history["step_size"].append(float(eta))
             local_history["rel_change"].append(float(rel))
+            local_history["pg_residual"].append(residual)
 
             support = tuple(np.flatnonzero(np.abs(w) > self.support_threshold).tolist())
             support_history.append(support)
@@ -347,6 +395,9 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             )
             self._push_history(
                 "rel_change_history_by_component", local_hist["rel_change"]
+            )
+            self._push_history(
+                "pg_residual_history_by_component", local_hist["pg_residual"]
             )
 
             # Sequential deflation (shared policy across Euclidean baselines).

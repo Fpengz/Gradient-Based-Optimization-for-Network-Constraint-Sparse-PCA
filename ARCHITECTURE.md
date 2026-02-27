@@ -9,6 +9,8 @@
   - `GeneralizedPowerMethod`: GPower baseline.
   - `NetworkSparsePCA`: graph + sparsity model (`pg` and `maspg_car` modes).
   - `NetworkSparsePCA_StiefelManifold`: multi-component manifold proximal-gradient solver on the Stiefel set.
+  - `TorchNetworkSparsePCA`: optional PyTorch backend for PG/MASPG-style updates.
+  - `TorchNetworkSparsePCA_GeooptStiefel`: optional Geoopt Stiefel-manifold backend.
 - `src/utils/`
   - `graph.py`: graph constructors and Laplacians.
   - `metrics.py`: explained variance, support F1, top-k support F1, connectivity, smoothness.

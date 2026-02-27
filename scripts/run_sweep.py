@@ -95,6 +95,26 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional synthetic-graph perturbation rate in [0, 1].",
     )
+    parser.add_argument(
+        "--backend",
+        type=str,
+        default="numpy",
+        choices=["numpy", "torch", "torch-geoopt"],
+        help="Backend for graph-constrained methods.",
+    )
+    parser.add_argument(
+        "--torch-device",
+        type=str,
+        default="cpu",
+        help="Torch device when using torch backends.",
+    )
+    parser.add_argument(
+        "--torch-dtype",
+        type=str,
+        default="float64",
+        choices=["float32", "float64"],
+        help="Torch dtype when using torch backends.",
+    )
     return parser.parse_args()
 
 
@@ -126,6 +146,9 @@ def main() -> None:
                 max_iter=args.max_iter,
                 random_state=args.seed,
                 n_components=args.n_components,
+                backend=args.backend,
+                torch_device=args.torch_device,
+                torch_dtype=args.torch_dtype,
             )
             methods = {
                 "NetSPCA-PG": methods["NetSPCA-PG"],
