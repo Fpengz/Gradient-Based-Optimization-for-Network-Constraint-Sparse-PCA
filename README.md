@@ -81,6 +81,21 @@ This project uses `uv` for modern, fast Python package management.
     uv run python scripts/run_large_scale_stress.py --n-features-grid 2000,3000 --n-repeats 1
     ```
 
+*   **Backend comparison (NumPy vs Torch vs Torch+Geoopt, when installed):**
+    ```bash
+    uv run python scripts/run_backend_comparison.py --n-repeats 3
+    ```
+
+*   **Dynamic graph robustness experiment:**
+    ```bash
+    uv run python scripts/run_dynamic_graph_experiment.py --n-steps 5
+    ```
+
+*   **Pinned paper artifact manifests:**
+    ```bash
+    uv run python scripts/reproduce_paper_artifacts.py
+    ```
+
 ---
 
 ## 🛠 Implemented Algorithms
@@ -118,8 +133,8 @@ This project uses `uv` for modern, fast Python package management.
 
 CI is configured in `.github/workflows/ci.yml` and runs:
 
-- `uv run ruff check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests`
-- `uv run black --check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests`
+- `uv run ruff check src/experiments src/models src/utils scripts tests`
+- `uv run black --check src/experiments src/models src/utils scripts tests`
 - `uv run pytest -q`
 
 ## 🔒 Pre-commit Hook
@@ -132,8 +147,8 @@ bash scripts/install_git_hooks.sh
 
 The hook runs on every commit:
 
-- `uv run ty check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests`
-- `uv run ruff check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests`
+- `uv run ty check src/experiments src/models src/utils scripts tests`
+- `uv run ruff check src/experiments src/models src/utils scripts tests`
 - `uv run pytest -q`
 
 ---

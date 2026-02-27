@@ -18,7 +18,7 @@
 
 - Data model: rank-1 latent signal with additive Gaussian noise.
 - Ground-truth support: sampled as a connected set on the feature graph.
-- Graph families: `chain`, `grid`, `er`, `sbm`.
+- Graph families: `chain`, `grid`, `er`, `rgg`, `sbm`.
 - Primary metrics:
   - explained variance
   - precision / recall / F1
@@ -63,6 +63,7 @@
 - LaTeX table exports (`summary_table.tex`, `netspca_summary.tex`).
 - Sweep figures for trade-off plots.
 - Real-data comparison outputs (`colon-comparison-*`, `pitprop-comparison-*`).
+- Synthetic significance artifacts (`significance.csv`, `significance.json`) from paired tests vs `NetSPCA-PG`.
 - Large-scale stress outputs (`large-scale-stress-*`) with stationarity fields:
   - `pg_residual_last_mean`
   - `pg_residual_ratio_mean`
@@ -80,4 +81,7 @@ uv run python scripts/run_experiment.py --dataset colon
 uv run python scripts/run_experiment.py --dataset pitprop
 uv run python scripts/reproduce_figures.py
 uv run python scripts/run_large_scale_stress.py --n-features-grid 2000,3000 --n-repeats 1
+uv run python scripts/run_backend_comparison.py --n-repeats 3
+uv run python scripts/run_dynamic_graph_experiment.py --n-steps 5
+uv run python scripts/reproduce_paper_artifacts.py
 ```

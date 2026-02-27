@@ -29,6 +29,7 @@ Artifacts are written to `results/synth-comparison-<timestamp>/`:
 - `records.json` / `records.csv`
 - `summary.csv`
 - `summary_table.tex`
+- `significance.csv` / `significance.json` (paired tests vs `NetSPCA-PG`, when pairings are available)
 
 Recorded metrics include:
 
@@ -109,6 +110,43 @@ uv run python scripts/reproduce_figures.py
 
 This executes synthetic comparison, synthetic sweep, and colon comparison in sequence.
 
+## Backend comparison (implementation backend parity)
+
+```bash
+uv run python scripts/run_backend_comparison.py --n-repeats 3 --seed 42
+```
+
+Artifacts are written to `results/backend-comparison-<timestamp>/`:
+
+- `config.json`
+- `records.csv`
+- `summary.csv`
+- `significance.csv` / `significance.json` (backend vs NumPy paired tests)
+
+## Dynamic graph robustness
+
+```bash
+uv run python scripts/run_dynamic_graph_experiment.py --n-steps 5 --seed 42
+```
+
+Artifacts are written to `results/dynamic-graph-<timestamp>/`:
+
+- `config.json`
+- `records.csv`
+- `summary.csv`
+
+## Pinned paper artifact manifests
+
+```bash
+uv run python scripts/reproduce_paper_artifacts.py
+```
+
+This executes the default manifest set in `benchmarks/manifests/`:
+
+- `paper_core.json`
+- `paper_misspec.json`
+- `paper_large_scale.json`
+
 ## Large-scale stress (`p >= 2000`)
 
 ```bash
@@ -128,8 +166,8 @@ Outputs include stationarity diagnostics in `summary.csv`:
 ## Validation checks
 
 ```bash
-uv run ty check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests
+uv run ty check src/experiments src/models src/utils scripts tests
 uv run pytest -q
-uv run ruff check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests
-uv run black --check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests
+uv run ruff check src/experiments src/models src/utils scripts tests
+uv run black --check src/experiments src/models src/utils scripts tests
 ```

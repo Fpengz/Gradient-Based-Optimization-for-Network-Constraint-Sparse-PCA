@@ -15,6 +15,7 @@ from .real_benchmark import (
     run_real_benchmark,
     summarize_real_records,
 )
+from .stats import SignificanceResult, bootstrap_mean_diff_ci, paired_significance
 
 __all__ = [
     "SyntheticBenchmarkConfig",
@@ -28,4 +29,7 @@ __all__ = [
     "build_feature_graph",
     "run_real_benchmark",
     "summarize_real_records",
+    "SignificanceResult",
+    "bootstrap_mean_diff_ci",
+    "paired_significance",
 ]

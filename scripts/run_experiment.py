@@ -15,6 +15,7 @@ from src.experiments.synthetic_benchmark import (
     run_repeated_benchmark,
     summarize_records,
 )
+from src.experiments.stats import paired_significance
 from src.experiments.real_benchmark import (
     RealBenchmarkConfig,
     run_real_benchmark,
@@ -40,6 +41,57 @@ def _to_latex_table(df: pd.DataFrame) -> str:
     view = df[cols].copy()
     view.columns = ["Method", "Expl.Var", "F1", "LCC Ratio", "Runtime(s)"]
     return view.to_latex(index=False, float_format=lambda x: f"{x:.4f}")
+
+
+def _compute_significance(
+    records: list[dict[str, object]],
+    reference_method: str = "NetSPCA-PG",
+    metrics: tuple[str, ...] = ("f1", "f1_topk", "explained_variance", "runtime_sec"),
+) -> pd.DataFrame:
+    """Paired significance by seed/repeat versus a reference method."""
+    if not records:
+        return pd.DataFrame()
+    df = pd.DataFrame(records)
+    if "method" not in df.columns:
+        return pd.DataFrame()
+    if reference_method not in set(df["method"].astype(str)):
+        return pd.DataFrame()
+    key_cols = [c for c in ("seed", "repeat", "graph_type") if c in df.columns]
+    ref = df[df["method"] == reference_method]
+    rows: list[dict[str, object]] = []
+    for method in sorted(set(df["method"].astype(str))):
+        if method == reference_method:
+            continue
+        cur = df[df["method"] == method]
+        merged = ref.merge(cur, on=key_cols, suffixes=("_ref", "_cur"))
+        if merged.empty:
+            continue
+        for metric in metrics:
+            ref_col = f"{metric}_ref"
+            cur_col = f"{metric}_cur"
+            if ref_col not in merged.columns or cur_col not in merged.columns:
+                continue
+            res = paired_significance(
+                values_a=merged[cur_col].astype(float).values,
+                values_b=merged[ref_col].astype(float).values,
+                metric=metric,
+                method_a=method,
+                method_b=reference_method,
+            )
+            rows.append(
+                {
+                    "metric": res.metric,
+                    "method_a": res.method_a,
+                    "method_b": res.method_b,
+                    "n_pairs": res.n_pairs,
+                    "mean_diff": res.mean_diff,
+                    "p_value": res.p_value,
+                    "test": res.test,
+                    "ci_low": res.ci_low,
+                    "ci_high": res.ci_high,
+                }
+            )
+    return pd.DataFrame(rows)
 
 
 def parse_args() -> argparse.Namespace:
@@ -188,6 +240,13 @@ def main() -> None:
     df_summary = pd.DataFrame(summary)
     df_records.to_csv(outdir / "records.csv", index=False)
     df_summary.to_csv(outdir / "summary.csv", index=False)
+    if args.dataset == "synthetic":
+        df_sig = _compute_significance(records)
+        if not df_sig.empty:
+            df_sig.to_csv(outdir / "significance.csv", index=False)
+            (outdir / "significance.json").write_text(
+                df_sig.to_json(orient="records", indent=2), encoding="utf-8"
+            )
     if args.dataset == "synthetic" and not df_summary.empty:
         (outdir / "summary_table.tex").write_text(
             _to_latex_table(df_summary), encoding="utf-8"
