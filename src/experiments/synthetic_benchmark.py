@@ -245,6 +245,14 @@ def _curve_from_history(model: Any, key: str) -> list[float]:
     return out
 
 
+def _fit_with_optional_graph(estimator: Any, X: np.ndarray, graph: GraphData) -> None:
+    """Fit estimators, passing graph when supported."""
+    try:
+        estimator.fit(X, graph=graph)
+    except TypeError:
+        estimator.fit(X)
+
+
 def _first_component(model: Any) -> np.ndarray:
     comp = np.asarray(model.components_, dtype=float)
     if comp.ndim != 2 or comp.shape[0] == 0:
@@ -433,10 +441,7 @@ def run_benchmark_once(
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             warnings.simplefilter("ignore", category=ConvergenceWarning)
-            if isinstance(estimator, NetworkSparsePCA):
-                estimator.fit(X, graph=graph_eval)
-            else:
-                estimator.fit(X)
+            _fit_with_optional_graph(estimator, X, graph_eval)
         runtime_sec = perf_counter() - tic
 
         with warnings.catch_warnings():
@@ -557,6 +562,45 @@ def summarize_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
             [1.0 if bool(r.get("converged")) else 0.0 for r in rows]
         )
         out["converged_rate"] = float(converged_rate)
+
+        # Stationarity/convergence diagnostics from per-run curves when available.
+        residual_last: list[float] = []
+        residual_ratio: list[float] = []
+        monotone_flags: list[float] = []
+        for r in rows:
+            resid_curve = [
+                float(v)
+                for v in (r.get("pg_residual_curve") or [])
+                if np.isfinite(float(v))
+            ]
+            obj_curve = [
+                float(v) for v in (r.get("objective_curve") or []) if np.isfinite(float(v))
+            ]
+            if resid_curve:
+                residual_last.append(resid_curve[-1])
+                residual_ratio.append(resid_curve[-1] / (resid_curve[0] + 1e-12))
+            if obj_curve:
+                mono = all(
+                    obj_curve[i] <= obj_curve[i - 1] + 1e-10
+                    for i in range(1, len(obj_curve))
+                )
+                monotone_flags.append(1.0 if mono else 0.0)
+
+        out["pg_residual_last_mean"] = (
+            float(np.mean(residual_last)) if residual_last else float("nan")
+        )
+        out["pg_residual_last_std"] = (
+            float(np.std(residual_last, ddof=0)) if residual_last else float("nan")
+        )
+        out["pg_residual_ratio_mean"] = (
+            float(np.mean(residual_ratio)) if residual_ratio else float("nan")
+        )
+        out["pg_residual_ratio_std"] = (
+            float(np.std(residual_ratio, ddof=0)) if residual_ratio else float("nan")
+        )
+        out["objective_monotone_rate"] = (
+            float(np.mean(monotone_flags)) if monotone_flags else float("nan")
+        )
         summary.append(out)
 
     summary.sort(key=lambda r: r["f1_mean"], reverse=True)

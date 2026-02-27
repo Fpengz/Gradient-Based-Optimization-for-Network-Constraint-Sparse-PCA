@@ -121,6 +121,8 @@ def test_run_benchmark_once_reports_topk_and_misspecification_metrics():
     row = records[0]
     assert "f1_topk" in row
     assert "graph_misspec_rate" in row
+    assert "objective_curve" in row
+    assert "pg_residual_curve" in row
 
 
 def test_build_baselines_can_include_stiefel_solver():
@@ -158,3 +160,16 @@ def test_build_baselines_torch_geoopt_stiefel_wiring():
         backend="torch-geoopt",
     )
     assert type(methods["NetSPCA-Stiefel"]).__name__ == "TorchNetworkSparsePCA_GeooptStiefel"
+
+
+def test_summarize_records_includes_stationarity_fields():
+    cfg = SyntheticBenchmarkConfig(
+        n_samples=36, n_features=16, support_size=4, random_state=12
+    )
+    methods = {"NetSPCA-PG": build_baselines(max_iter=25)["NetSPCA-PG"]}
+    records = run_repeated_benchmark(cfg=cfg, methods=methods, n_repeats=2, base_seed=12)
+    summary = summarize_records(records)
+    row = summary[0]
+    assert "pg_residual_last_mean" in row
+    assert "pg_residual_ratio_mean" in row
+    assert "objective_monotone_rate" in row

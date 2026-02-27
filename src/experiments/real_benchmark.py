@@ -14,10 +14,10 @@ from sklearn.exceptions import ConvergenceWarning
 from data.pitprop import get_pitprop_correlation_matrix
 from src.experiments.synthetic_benchmark import (
     _estimated_support,
+    _fit_with_optional_graph,
     _sanitize_component,
     build_baselines,
 )
-from src.models.network_sparse_pca import NetworkSparsePCA
 from src.utils.graph import GraphData, chain_graph, knn_graph
 from src.utils.metrics import explained_variance, laplacian_energy
 
@@ -100,10 +100,7 @@ def run_real_benchmark(cfg: RealBenchmarkConfig) -> list[dict[str, Any]]:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             warnings.simplefilter("ignore", category=ConvergenceWarning)
-            if isinstance(estimator, NetworkSparsePCA):
-                estimator.fit(X, graph=graph)
-            else:
-                estimator.fit(X)
+            _fit_with_optional_graph(estimator, X, graph)
         runtime_sec = perf_counter() - tic
 
         w_hat = _sanitize_component(np.asarray(estimator.components_[0], dtype=float))

@@ -76,6 +76,11 @@ This project uses `uv` for modern, fast Python package management.
     uv run python scripts/reproduce_figures.py
     ```
 
+*   **Large-scale stress suite (`p >= 2000`):**
+    ```bash
+    uv run python scripts/run_large_scale_stress.py --n-features-grid 2000,3000 --n-repeats 1
+    ```
+
 ---
 
 ## 🛠 Implemented Algorithms

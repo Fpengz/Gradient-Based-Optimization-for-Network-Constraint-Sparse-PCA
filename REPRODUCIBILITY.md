@@ -109,6 +109,22 @@ uv run python scripts/reproduce_figures.py
 
 This executes synthetic comparison, synthetic sweep, and colon comparison in sequence.
 
+## Large-scale stress (`p >= 2000`)
+
+```bash
+uv run python scripts/run_large_scale_stress.py \
+  --n-features-grid 2000,3000 \
+  --n-repeats 1 \
+  --max-iter 200 \
+  --seed 42
+```
+
+Outputs include stationarity diagnostics in `summary.csv`:
+
+- `pg_residual_last_mean`
+- `pg_residual_ratio_mean`
+- `objective_monotone_rate`
+
 ## Validation checks
 
 ```bash

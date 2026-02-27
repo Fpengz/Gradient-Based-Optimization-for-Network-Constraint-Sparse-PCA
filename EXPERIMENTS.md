@@ -63,6 +63,10 @@
 - LaTeX table exports (`summary_table.tex`, `netspca_summary.tex`).
 - Sweep figures for trade-off plots.
 - Real-data comparison outputs (`colon-comparison-*`, `pitprop-comparison-*`).
+- Large-scale stress outputs (`large-scale-stress-*`) with stationarity fields:
+  - `pg_residual_last_mean`
+  - `pg_residual_ratio_mean`
+  - `objective_monotone_rate`
 
 ## Reproduction commands
 
@@ -75,4 +79,5 @@ uv run python scripts/run_sweep.py --n-repeats 2 --graph-misspec-rate 0.1
 uv run python scripts/run_experiment.py --dataset colon
 uv run python scripts/run_experiment.py --dataset pitprop
 uv run python scripts/reproduce_figures.py
+uv run python scripts/run_large_scale_stress.py --n-features-grid 2000,3000 --n-repeats 1
 ```
