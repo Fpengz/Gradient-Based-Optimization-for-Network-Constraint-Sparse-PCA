@@ -58,6 +58,7 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         random_state: int | None = None,
         support_threshold: float = 1e-8,
         active_set_window: int = 10,
+        qn_memory: int = 10,
     ):
         self.n_components = n_components
         self.lambda1 = lambda1
@@ -72,6 +73,7 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         self.random_state = random_state
         self.support_threshold = support_threshold
         self.active_set_window = active_set_window
+        self.qn_memory = qn_memory
 
     @staticmethod
     def _soft_threshold(w: np.ndarray, threshold: float) -> np.ndarray:
@@ -220,6 +222,69 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
                 return np.zeros_like(y), eta_trial, grad
             eta_trial *= 0.5
 
+    def _accept_with_backtracking_direction(
+        self,
+        Xc: np.ndarray,
+        y: np.ndarray,
+        L: sp.spmatrix | np.ndarray,
+        eta: float,
+        direction: np.ndarray,
+    ) -> tuple[np.ndarray, float]:
+        eta_trial = eta
+        while True:
+            v = y + eta_trial * direction
+            s = self._soft_threshold(v, eta_trial * self.lambda1)
+            w_trial = self._proj_l2_ball(s)
+            if not np.all(np.isfinite(w_trial)):
+                return np.zeros_like(y), eta_trial
+            if not self.monotone_backtracking:
+                return w_trial, eta_trial
+            f_y = self._objective(Xc, y, L)
+            f_trial = self._objective(Xc, w_trial, L)
+            if not np.isfinite(f_y) or not np.isfinite(f_trial):
+                return np.zeros_like(y), eta_trial
+            if f_trial <= f_y + 1e-12 or eta_trial < 1e-16:
+                return w_trial, eta_trial
+            eta_trial *= 0.5
+
+    def _lbfgs_direction(
+        self,
+        grad: np.ndarray,
+        s_hist: list[np.ndarray],
+        y_hist: list[np.ndarray],
+    ) -> np.ndarray:
+        if not s_hist or not y_hist:
+            return -grad
+        q = grad.copy()
+        alphas: list[float] = []
+        rhos: list[float] = []
+        for s, y in zip(reversed(s_hist), reversed(y_hist)):
+            ys = float(np.dot(y, s))
+            if not np.isfinite(ys) or ys <= 1e-16:
+                return -grad
+            rho = 1.0 / ys
+            alpha = rho * float(np.dot(s, q))
+            q = q - alpha * y
+            alphas.append(alpha)
+            rhos.append(rho)
+
+        s_last = s_hist[-1]
+        y_last = y_hist[-1]
+        yy = float(np.dot(y_last, y_last))
+        sy = float(np.dot(s_last, y_last))
+        gamma = sy / yy if np.isfinite(yy) and yy > 1e-16 else 1.0
+        r = gamma * q
+
+        for i, (s, y) in enumerate(zip(s_hist, y_hist)):
+            rho = rhos[-(i + 1)]
+            alpha = alphas[-(i + 1)]
+            beta = rho * float(np.dot(y, r))
+            r = r + s * (alpha - beta)
+        d = -r
+        if not np.all(np.isfinite(d)) or float(np.dot(d, grad)) >= -1e-12:
+            return -grad
+        return d
+
     def _fit_one_component(
         self,
         Xc: np.ndarray,
@@ -244,6 +309,8 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             "pg_residual": [],
         }
         support_history: list[tuple[int, ...]] = []
+        qn_s_hist: list[np.ndarray] = []
+        qn_y_hist: list[np.ndarray] = []
         converged = False
         n_iter = self.max_iter
         w_prev = w.copy()
@@ -273,13 +340,23 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             if not np.all(np.isfinite(y)):
                 return np.zeros_like(w), local_history, False, it + 1
 
-            w_trial, eta, _ = self._accept_with_backtracking(
-                Xc,
-                y,
-                L,
-                eta,
-                use_smooth_majorization=(self.algorithm == "maspg_car"),
-            )
+            if self.algorithm == "prox_qn":
+                direction = self._lbfgs_direction(grad_old, qn_s_hist, qn_y_hist)
+                w_trial, eta = self._accept_with_backtracking_direction(
+                    Xc,
+                    y,
+                    L,
+                    eta,
+                    direction=direction,
+                )
+            else:
+                w_trial, eta, _ = self._accept_with_backtracking(
+                    Xc,
+                    y,
+                    L,
+                    eta,
+                    use_smooth_majorization=(self.algorithm == "maspg_car"),
+                )
 
             if self.algorithm == "maspg_car" and self.monotone_backtracking:
                 obj_old = self._objective(Xc, w, L)
@@ -296,6 +373,17 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             w_prev = w_old
             grad_prev = grad_old
             w = w_trial
+            if self.algorithm == "prox_qn":
+                grad_new = self._smooth_grad(Xc, w, L)
+                s_k = w - w_old
+                y_k = grad_new - grad_old
+                sy = float(np.dot(s_k, y_k))
+                if np.isfinite(sy) and sy > 1e-12:
+                    qn_s_hist.append(s_k.copy())
+                    qn_y_hist.append(y_k.copy())
+                    if len(qn_s_hist) > max(int(self.qn_memory), 1):
+                        qn_s_hist.pop(0)
+                        qn_y_hist.pop(0)
 
             obj = self._objective(Xc, w, L)
             rel = np.linalg.norm(w - w_old) / (np.linalg.norm(w_old) + 1e-12)
@@ -355,7 +443,7 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         if L is None:
             L = sp.eye(n_features, format="csr")
 
-        if self.algorithm not in {"pg", "maspg_car"}:
+        if self.algorithm not in {"pg", "maspg_car", "prox_qn"}:
             raise ValueError(f"Unknown algorithm={self.algorithm!r}")
 
         rng = np.random.default_rng(self.random_state)
@@ -421,33 +509,50 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         graph=None,
         lambda1_grid: list[float] | tuple[float, ...] | None = None,
         lambda2_grid: list[float] | tuple[float, ...] | None = None,
+        ordering: str = "serpentine",
     ) -> list[dict[str, object]]:
         """Fit a continuation path over (lambda1, lambda2) with warm starts."""
         l1_vals = list(lambda1_grid) if lambda1_grid is not None else [self.lambda1]
         l2_vals = list(lambda2_grid) if lambda2_grid is not None else [self.lambda2]
         if not l1_vals or not l2_vals:
             raise ValueError("lambda grids must be non-empty.")
+        if ordering not in {"input", "serpentine"}:
+            raise ValueError("ordering must be 'input' or 'serpentine'.")
+
+        if ordering == "serpentine":
+            l1_vals = sorted(float(v) for v in l1_vals)
+            l2_base = sorted(float(v) for v in l2_vals)
+            pairs: list[tuple[float, float]] = []
+            for i, l1 in enumerate(l1_vals):
+                l2_vals_row = l2_base if i % 2 == 0 else list(reversed(l2_base))
+                for l2 in l2_vals_row:
+                    pairs.append((l1, l2))
+        else:
+            pairs = [
+                (float(l1), float(l2))
+                for l1 in l1_vals
+                for l2 in l2_vals
+            ]
 
         base_params = self.get_params(deep=False)
         path: list[dict[str, object]] = []
         warm_components: np.ndarray | None = None
-        for l1 in l1_vals:
-            for l2 in l2_vals:
-                params = dict(base_params)
-                params["lambda1"] = float(l1)
-                params["lambda2"] = float(l2)
-                model = self.__class__(**params)
-                model.fit(X, L=L, graph=graph, init_components=warm_components)
-                path.append(
-                    {
-                        "lambda1": float(l1),
-                        "lambda2": float(l2),
-                        "model": model,
-                        "warm_started": warm_components is not None,
-                        "converged": bool(getattr(model, "converged_", False)),
-                    }
-                )
-                warm_components = model.components_.copy()
+        for l1, l2 in pairs:
+            params = dict(base_params)
+            params["lambda1"] = float(l1)
+            params["lambda2"] = float(l2)
+            model = self.__class__(**params)
+            model.fit(X, L=L, graph=graph, init_components=warm_components)
+            path.append(
+                {
+                    "lambda1": float(l1),
+                    "lambda2": float(l2),
+                    "model": model,
+                    "warm_started": warm_components is not None,
+                    "converged": bool(getattr(model, "converged_", False)),
+                }
+            )
+            warm_components = model.components_.copy()
         return path
 
     def transform(self, X):
@@ -461,6 +566,14 @@ class NetworkSparsePCA_MASPG_CAR(NetworkSparsePCA):
 
     def __init__(self, *args, **kwargs):
         kwargs.setdefault("algorithm", "maspg_car")
+        super().__init__(*args, **kwargs)
+
+
+class NetworkSparsePCA_ProxQN(NetworkSparsePCA):
+    """Convenience wrapper for proximal quasi-Newton updates."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("algorithm", "prox_qn")
         super().__init__(*args, **kwargs)
 
 

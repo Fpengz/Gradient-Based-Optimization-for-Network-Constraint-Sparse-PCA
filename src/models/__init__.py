@@ -2,6 +2,7 @@ from .generalized_power_method import GeneralizedPowerMethod
 from .network_sparse_pca import (
     NetworkSparsePCA,
     NetworkSparsePCA_MASPG_CAR,
+    NetworkSparsePCA_ProxQN,
     NetworkSparsePCA_StiefelManifold,
 )
 from .network_sparse_pca_torch import (
@@ -18,6 +19,7 @@ __all__ = [
     "GeneralizedPowerMethod",
     "NetworkSparsePCA",
     "NetworkSparsePCA_MASPG_CAR",
+    "NetworkSparsePCA_ProxQN",
     "NetworkSparsePCA_StiefelManifold",
     "TorchNetworkSparsePCA",
     "TorchNetworkSparsePCA_GeooptStiefel",

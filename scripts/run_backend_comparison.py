@@ -61,7 +61,7 @@ def _run_backend(
     )
     methods = {
         name: methods[name]
-        for name in ["Graph-PCA", "NetSPCA-PG", "NetSPCA-MASPG-CAR"]
+        for name in ["Graph-PCA", "NetSPCA-PG", "NetSPCA-MASPG-CAR", "NetSPCA-ProxQN"]
     }
     records = run_repeated_benchmark(
         cfg=cfg, methods=methods, n_repeats=args.n_repeats, base_seed=args.seed

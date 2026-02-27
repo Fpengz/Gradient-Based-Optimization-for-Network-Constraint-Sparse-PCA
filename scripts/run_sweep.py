@@ -24,7 +24,11 @@ def _parse_float_list(text: str) -> list[float]:
 
 def _to_df(records: list[dict[str, Any]]) -> pd.DataFrame:
     df = pd.DataFrame(records)
-    return df[df["method"].isin(["NetSPCA-PG", "NetSPCA-MASPG-CAR"])].copy()
+    return df[
+        df["method"].isin(
+            ["NetSPCA-PG", "NetSPCA-MASPG-CAR", "NetSPCA-ProxQN"]
+        )
+    ].copy()
 
 
 def _plot_sweep(df: pd.DataFrame, outdir: Path) -> None:
@@ -153,6 +157,7 @@ def main() -> None:
             methods = {
                 "NetSPCA-PG": methods["NetSPCA-PG"],
                 "NetSPCA-MASPG-CAR": methods["NetSPCA-MASPG-CAR"],
+                "NetSPCA-ProxQN": methods["NetSPCA-ProxQN"],
             }
             records = run_repeated_benchmark(
                 cfg=cfg,

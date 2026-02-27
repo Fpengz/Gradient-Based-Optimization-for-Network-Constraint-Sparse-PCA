@@ -57,7 +57,10 @@ def main() -> None:
         torch_device=args.torch_device,
         torch_dtype=args.torch_dtype,
     )
-    methods = {k: methods[k] for k in ["Graph-PCA", "NetSPCA-PG", "NetSPCA-MASPG-CAR"]}
+    methods = {
+        k: methods[k]
+        for k in ["Graph-PCA", "NetSPCA-PG", "NetSPCA-MASPG-CAR", "NetSPCA-ProxQN"]
+    }
 
     rows: list[dict[str, object]] = []
     for step in range(args.n_steps):

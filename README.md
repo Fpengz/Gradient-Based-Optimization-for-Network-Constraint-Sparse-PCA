@@ -38,7 +38,7 @@ This project uses `uv` for modern, fast Python package management.
     ```bash
     uv run python scripts/run_experiment.py --n-repeats 3
     ```
-    This runs: `PCA`, `L1-SPCA-ProxGrad`, `Graph-PCA`, `NetSPCA-PG`, `NetSPCA-MASPG-CAR`, `GPower`, and `ElasticNet-SPCA`.
+    This runs: `PCA`, `L1-SPCA-ProxGrad`, `Graph-PCA`, `NetSPCA-PG`, `NetSPCA-MASPG-CAR`, `NetSPCA-ProxQN`, `GPower`, and `ElasticNet-SPCA`.
 
 *   **Run graph methods with Torch backend:**
     ```bash
@@ -105,6 +105,7 @@ This project uses `uv` for modern, fast Python package management.
 | **Zou SPCA** | Elastic Net / Regression | Zou et al. (2006) |
 | **GPM** | Generalized Power Method | Journée et al. (2010) |
 | **NC-SPCA** | Laplacian Regularization / Proximal Grad | Wang Zhoufu (2026) |
+| **NC-SPCA (ProxQN)** | Proximal quasi-Newton (L-BFGS preconditioned prox-step) | This repository |
 | **NC-SPCA (Stiefel)** | Manifold proximal gradient + Stiefel retraction | Chen et al. (ManPG lineage) |
 | **NC-SPCA (Torch)** | PyTorch PG/MASPG-CAR backend | This repository |
 | **NC-SPCA (Torch + Geoopt)** | Geoopt Stiefel manifold backend | This repository |
@@ -161,7 +162,7 @@ Classical PCA produces dense loading vectors, which are difficult to interpret i
 $$ \min_{\|w\|_2 \le 1} -w^\top \hat\Sigma w + \lambda_1 \|w\|_1 + \lambda_2 w^\top L w $$
 This encourages the selection of **connected, smooth supports** on the feature network, leading to more scientifically valid factor discovery.
 
-For regularization-path workflows, `NetworkSparsePCA.fit_path(...)` provides warm-start continuation across `lambda1`/`lambda2` grids.
+For regularization-path workflows, `NetworkSparsePCA.fit_path(...)` provides warm-start continuation across `lambda1`/`lambda2` grids with serpentine path ordering by default (`ordering="serpentine"`).
 
 Torch side-by-side backends are available as:
 

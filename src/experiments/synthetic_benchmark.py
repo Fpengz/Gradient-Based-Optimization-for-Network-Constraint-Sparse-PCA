@@ -14,8 +14,9 @@ from sklearn.exceptions import ConvergenceWarning
 from src.models import (
     GeneralizedPowerMethod,
     NetworkSparsePCA,
-    NetworkSparsePCA_StiefelManifold,
     NetworkSparsePCA_MASPG_CAR,
+    NetworkSparsePCA_ProxQN,
+    NetworkSparsePCA_StiefelManifold,
     PCAEstimator,
     SparsePCA_L1_ProxGrad,
     TorchNetworkSparsePCA,
@@ -326,6 +327,13 @@ def build_baselines(
             max_iter=max_iter,
             random_state=random_state,
         )
+        net_proxqn = NetworkSparsePCA_ProxQN(
+            n_components=n_components,
+            lambda1=lambda1,
+            lambda2=lambda2,
+            max_iter=max_iter,
+            random_state=random_state,
+        )
     else:
         graph_pca = TorchNetworkSparsePCA(
             n_components=n_components,
@@ -357,6 +365,8 @@ def build_baselines(
             device=torch_device,
             dtype=torch_dtype,
         )
+        # ProxQN currently available on NumPy backend; map to MASPG-CAR for torch.
+        net_proxqn = net_maspg
 
     baselines: dict[str, Any] = {
         "PCA": PCAEstimator(n_components=n_components),
@@ -369,6 +379,7 @@ def build_baselines(
         "Graph-PCA": graph_pca,
         "NetSPCA-PG": net_pg,
         "NetSPCA-MASPG-CAR": net_maspg,
+        "NetSPCA-ProxQN": net_proxqn,
         "GPower": GeneralizedPowerMethod(
             n_components=n_components,
             gamma=lambda1,

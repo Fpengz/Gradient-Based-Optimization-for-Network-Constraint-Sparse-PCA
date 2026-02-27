@@ -16,6 +16,9 @@ All notable changes to this project are documented in this file.
 - Dynamic graph experiment runner: `scripts/run_dynamic_graph_experiment.py`
 - Pinned manifest orchestration: `scripts/reproduce_paper_artifacts.py`
 - Statistical significance utilities in `src/experiments/stats.py`
+- Proximal quasi-Newton NC-SPCA variant:
+  - `NetworkSparsePCA_ProxQN`
+  - baseline key: `NetSPCA-ProxQN`
 - Audit and certification reports:
   - `IMPLEMENTATION_MAP.md`
   - `AUDIT_REPORT_METHOD.md`
@@ -33,6 +36,7 @@ All notable changes to this project are documented in this file.
   - `objective_monotone_rate`
 - Synthetic/real benchmark fitting now passes `graph` when estimator supports it (fixes torch graph-method wiring).
 - Added random geometric graph (RGG) support to graph generators and synthetic protocol.
+- `fit_path` continuation now supports warm-start-friendly serpentine ordering (`ordering="serpentine"`).
 
 ### Fixed
 - MASPG-CAR backtracking alignment with smooth-majorization test and monotone restart safeguards.

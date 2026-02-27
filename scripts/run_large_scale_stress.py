@@ -111,6 +111,7 @@ def main() -> None:
                 "Graph-PCA",
                 "NetSPCA-PG",
                 "NetSPCA-MASPG-CAR",
+                "NetSPCA-ProxQN",
             ]
         }
         records = run_repeated_benchmark(

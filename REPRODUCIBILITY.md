@@ -40,6 +40,8 @@ Recorded metrics include:
 - Laplacian energy
 - runtime / convergence
 
+Compared methods include `NetSPCA-ProxQN` in addition to `NetSPCA-PG` and `NetSPCA-MASPG-CAR`.
+
 ## Graph misspecification robustness
 
 ```bash

@@ -7,6 +7,7 @@
 3. `Graph-PCA` (`lambda1 = 0`)
 4. `NetSPCA-PG`
 5. `NetSPCA-MASPG-CAR`
+6. `NetSPCA-ProxQN`
 
 ## Optional extras
 
@@ -48,10 +49,11 @@
 - Start grid:
   - `lambda1`: `0.1, 0.15, 0.2, 0.3`
   - `lambda2`: `0.05, 0.1, 0.2, 0.25`
-- Use `NetworkSparsePCA.fit_path(...)` for continuation warm starts when scanning `(lambda1, lambda2)`.
+- Use `NetworkSparsePCA.fit_path(..., ordering="serpentine")` for continuation warm starts when scanning `(lambda1, lambda2)`.
 - Prefer:
   - `NetSPCA-PG` for theorem-aligned convergence analysis.
   - `NetSPCA-MASPG-CAR` for practical iteration/runtime reduction.
+  - `NetSPCA-ProxQN` for faster practical convergence in moderate/high-dimensional settings.
 - Track all of:
   - `objective_curve`
   - `pg_residual_curve`

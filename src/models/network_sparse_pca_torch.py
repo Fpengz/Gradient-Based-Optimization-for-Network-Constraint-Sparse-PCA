@@ -287,29 +287,45 @@ class TorchNetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin
         graph=None,
         lambda1_grid: list[float] | tuple[float, ...] | None = None,
         lambda2_grid: list[float] | tuple[float, ...] | None = None,
+        ordering: str = "serpentine",
     ) -> list[dict[str, object]]:
         l1_vals = list(lambda1_grid) if lambda1_grid is not None else [self.lambda1]
         l2_vals = list(lambda2_grid) if lambda2_grid is not None else [self.lambda2]
+        if ordering not in {"input", "serpentine"}:
+            raise ValueError("ordering must be 'input' or 'serpentine'.")
+        if ordering == "serpentine":
+            l1_vals = sorted(float(v) for v in l1_vals)
+            l2_base = sorted(float(v) for v in l2_vals)
+            pairs: list[tuple[float, float]] = []
+            for i, l1 in enumerate(l1_vals):
+                l2_vals_row = l2_base if i % 2 == 0 else list(reversed(l2_base))
+                for l2 in l2_vals_row:
+                    pairs.append((l1, l2))
+        else:
+            pairs = [
+                (float(l1), float(l2))
+                for l1 in l1_vals
+                for l2 in l2_vals
+            ]
         base_params = self.get_params(deep=False)
         path: list[dict[str, object]] = []
         warm = None
-        for l1 in l1_vals:
-            for l2 in l2_vals:
-                params = dict(base_params)
-                params["lambda1"] = float(l1)
-                params["lambda2"] = float(l2)
-                model = self.__class__(**params)
-                model.fit(X, L=L, graph=graph, init_components=warm)
-                path.append(
-                    {
-                        "lambda1": float(l1),
-                        "lambda2": float(l2),
-                        "model": model,
-                        "warm_started": warm is not None,
-                        "converged": bool(model.converged_),
-                    }
-                )
-                warm = model.components_.copy()
+        for l1, l2 in pairs:
+            params = dict(base_params)
+            params["lambda1"] = float(l1)
+            params["lambda2"] = float(l2)
+            model = self.__class__(**params)
+            model.fit(X, L=L, graph=graph, init_components=warm)
+            path.append(
+                {
+                    "lambda1": float(l1),
+                    "lambda2": float(l2),
+                    "model": model,
+                    "warm_started": warm is not None,
+                    "converged": bool(model.converged_),
+                }
+            )
+            warm = model.components_.copy()
         return path
 
     def transform(self, X):

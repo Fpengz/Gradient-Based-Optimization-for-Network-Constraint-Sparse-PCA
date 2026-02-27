@@ -137,6 +137,19 @@ def test_build_baselines_can_include_stiefel_solver():
     assert "NetSPCA-Stiefel" in methods
 
 
+def test_build_baselines_includes_proxqn_numpy():
+    methods = build_baselines(
+        lambda1=0.1,
+        lambda2=0.2,
+        max_iter=20,
+        random_state=0,
+        n_components=1,
+        backend="numpy",
+    )
+    assert "NetSPCA-ProxQN" in methods
+    assert type(methods["NetSPCA-ProxQN"]).__name__ == "NetworkSparsePCA_ProxQN"
+
+
 def test_build_baselines_torch_backend_wiring():
     methods = build_baselines(
         lambda1=0.1,
