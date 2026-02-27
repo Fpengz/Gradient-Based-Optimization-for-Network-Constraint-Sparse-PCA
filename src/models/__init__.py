@@ -4,6 +4,7 @@ from .network_sparse_pca import (
     NetworkSparsePCA_MASPG_CAR,
     NetworkSparsePCA_ProxQN,
     NetworkSparsePCA_StiefelManifold,
+    NetworkSparsePCA_StiefelStructured,
 )
 from .network_sparse_pca_torch import (
     TorchNetworkSparsePCA,
@@ -21,6 +22,7 @@ __all__ = [
     "NetworkSparsePCA_MASPG_CAR",
     "NetworkSparsePCA_ProxQN",
     "NetworkSparsePCA_StiefelManifold",
+    "NetworkSparsePCA_StiefelStructured",
     "TorchNetworkSparsePCA",
     "TorchNetworkSparsePCA_GeooptStiefel",
 ]

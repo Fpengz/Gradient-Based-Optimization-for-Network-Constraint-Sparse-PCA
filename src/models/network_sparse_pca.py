@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
+from time import perf_counter
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.decomposition import PCA
 
@@ -59,6 +60,8 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         support_threshold: float = 1e-8,
         active_set_window: int = 10,
         qn_memory: int = 10,
+        qn_orthant_aware: bool = True,
+        qn_min_curvature: float = 1e-12,
     ):
         self.n_components = n_components
         self.lambda1 = lambda1
@@ -74,6 +77,8 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         self.support_threshold = support_threshold
         self.active_set_window = active_set_window
         self.qn_memory = qn_memory
+        self.qn_orthant_aware = qn_orthant_aware
+        self.qn_min_curvature = qn_min_curvature
 
     @staticmethod
     def _soft_threshold(w: np.ndarray, threshold: float) -> np.ndarray:
@@ -229,22 +234,28 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         L: sp.spmatrix | np.ndarray,
         eta: float,
         direction: np.ndarray,
-    ) -> tuple[np.ndarray, float]:
+        orthant: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, float, bool]:
         eta_trial = eta
+        f_y = self._objective(Xc, y, L)
+        if not np.isfinite(f_y):
+            return np.zeros_like(y), eta_trial, False
         while True:
             v = y + eta_trial * direction
+            if orthant is not None:
+                v = np.where(v * orthant < 0.0, 0.0, v)
             s = self._soft_threshold(v, eta_trial * self.lambda1)
             w_trial = self._proj_l2_ball(s)
             if not np.all(np.isfinite(w_trial)):
-                return np.zeros_like(y), eta_trial
+                return np.zeros_like(y), eta_trial, False
             if not self.monotone_backtracking:
-                return w_trial, eta_trial
-            f_y = self._objective(Xc, y, L)
+                return w_trial, eta_trial, True
             f_trial = self._objective(Xc, w_trial, L)
             if not np.isfinite(f_y) or not np.isfinite(f_trial):
-                return np.zeros_like(y), eta_trial
+                return np.zeros_like(y), eta_trial, False
             if f_trial <= f_y + 1e-12 or eta_trial < 1e-16:
-                return w_trial, eta_trial
+                accepted = bool(f_trial <= f_y + 1e-12)
+                return w_trial, eta_trial, accepted
             eta_trial *= 0.5
 
     def _lbfgs_direction(
@@ -307,6 +318,9 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             "step_size": [],
             "rel_change": [],
             "pg_residual": [],
+            "qn_used": [],
+            "qn_accepted": [],
+            "qn_fallback": [],
         }
         support_history: list[tuple[int, ...]] = []
         qn_s_hist: list[np.ndarray] = []
@@ -340,15 +354,35 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             if not np.all(np.isfinite(y)):
                 return np.zeros_like(w), local_history, False, it + 1
 
+            qn_used = 0.0
+            qn_accepted = 0.0
+            qn_fallback = 0.0
             if self.algorithm == "prox_qn":
                 direction = self._lbfgs_direction(grad_old, qn_s_hist, qn_y_hist)
-                w_trial, eta = self._accept_with_backtracking_direction(
+                qn_used = 1.0
+                orthant = np.sign(y)
+                zero_mask = orthant == 0.0
+                orthant[zero_mask] = np.sign(-grad_old[zero_mask])
+                if not self.qn_orthant_aware:
+                    orthant = None
+                w_trial, eta, accepted = self._accept_with_backtracking_direction(
                     Xc,
                     y,
                     L,
                     eta,
                     direction=direction,
+                    orthant=orthant,
                 )
+                qn_accepted = 1.0 if accepted else 0.0
+                if not accepted:
+                    qn_fallback = 1.0
+                    w_trial, eta, _ = self._accept_with_backtracking(
+                        Xc,
+                        y,
+                        L,
+                        eta,
+                        use_smooth_majorization=False,
+                    )
             else:
                 w_trial, eta, _ = self._accept_with_backtracking(
                     Xc,
@@ -378,7 +412,7 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
                 s_k = w - w_old
                 y_k = grad_new - grad_old
                 sy = float(np.dot(s_k, y_k))
-                if np.isfinite(sy) and sy > 1e-12:
+                if np.isfinite(sy) and sy > max(float(self.qn_min_curvature), 1e-16):
                     qn_s_hist.append(s_k.copy())
                     qn_y_hist.append(y_k.copy())
                     if len(qn_s_hist) > max(int(self.qn_memory), 1):
@@ -399,25 +433,41 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             local_history["step_size"].append(float(eta))
             local_history["rel_change"].append(float(rel))
             local_history["pg_residual"].append(residual)
+            local_history["qn_used"].append(float(qn_used))
+            local_history["qn_accepted"].append(float(qn_accepted))
+            local_history["qn_fallback"].append(float(qn_fallback))
 
             support = tuple(np.flatnonzero(np.abs(w) > self.support_threshold).tolist())
             support_history.append(support)
             if (
-                self.algorithm == "maspg_car"
+                self.algorithm in {"maspg_car", "prox_qn"}
                 and len(support_history) >= self.active_set_window
                 and len(set(support_history[-self.active_set_window :])) == 1
                 and len(support) > 0
             ):
-                # Light restricted refinement: one gradient/prox step on active coordinates only.
+                # Restricted refinement: one prox step on active coordinates only.
                 active = np.array(support, dtype=int)
-                y_active = w[active].copy()
                 grad_full = self._smooth_grad(Xc, w, L)
-                v_active = y_active - eta * grad_full[active]
-                s_active = self._soft_threshold(v_active, eta * self.lambda1)
-                w_refined = w.copy()
-                w_refined[:] = 0.0
-                w_refined[active] = s_active
-                w = self._proj_l2_ball(w_refined)
+                d_active = np.zeros_like(w)
+                if self.algorithm == "prox_qn":
+                    d_full = self._lbfgs_direction(grad_full, qn_s_hist, qn_y_hist)
+                    d_active[active] = d_full[active]
+                    if float(np.dot(d_active, grad_full)) >= -1e-12:
+                        d_active[active] = -grad_full[active]
+                else:
+                    d_active[active] = -grad_full[active]
+
+                orthant = np.sign(w) if self.qn_orthant_aware else None
+                w_refined, _, accepted_ref = self._accept_with_backtracking_direction(
+                    Xc,
+                    w,
+                    L,
+                    eta,
+                    direction=d_active,
+                    orthant=orthant,
+                )
+                if accepted_ref and self._objective(Xc, w_refined, L) <= self._objective(Xc, w, L) + 1e-12:
+                    w = self._proj_l2_ball(w_refined)
 
             if rel < self.tol or rel_obj < self.tol:
                 converged = True
@@ -487,6 +537,15 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             self._push_history(
                 "pg_residual_history_by_component", local_hist["pg_residual"]
             )
+            self._push_history(
+                "qn_used_history_by_component", local_hist["qn_used"]
+            )
+            self._push_history(
+                "qn_accepted_history_by_component", local_hist["qn_accepted"]
+            )
+            self._push_history(
+                "qn_fallback_history_by_component", local_hist["qn_fallback"]
+            )
 
             # Sequential deflation (shared policy across Euclidean baselines).
             w_unit = w / (np.linalg.norm(w) + 1e-12)
@@ -534,7 +593,27 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
                 for l2 in l2_vals
             ]
 
-        base_params = self.get_params(deep=False)
+        base_params = {
+            "n_components": self.n_components,
+            "lambda1": self.lambda1,
+            "lambda2": self.lambda2,
+            "max_iter": self.max_iter,
+            "learning_rate": self.learning_rate,
+            "tol": self.tol,
+            "init": self.init,
+            "verbose": self.verbose,
+            "monotone_backtracking": self.monotone_backtracking,
+            "algorithm": self.algorithm,
+            "random_state": self.random_state,
+            "support_threshold": self.support_threshold,
+            "active_set_window": self.active_set_window,
+            "qn_memory": self.qn_memory,
+            "qn_orthant_aware": self.qn_orthant_aware,
+            "qn_min_curvature": self.qn_min_curvature,
+        }
+        if isinstance(self, NetworkSparsePCA_StiefelManifold):
+            base_params["sparsity_mode"] = self.sparsity_mode
+            base_params["group_lambda"] = self.group_lambda
         path: list[dict[str, object]] = []
         warm_components: np.ndarray | None = None
         for l1, l2 in pairs:
@@ -542,7 +621,9 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
             params["lambda1"] = float(l1)
             params["lambda2"] = float(l2)
             model = self.__class__(**params)
+            tic = perf_counter()
             model.fit(X, L=L, graph=graph, init_components=warm_components)
+            runtime_sec = perf_counter() - tic
             path.append(
                 {
                     "lambda1": float(l1),
@@ -550,6 +631,7 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
                     "model": model,
                     "warm_started": warm_components is not None,
                     "converged": bool(getattr(model, "converged_", False)),
+                    "runtime_sec": float(runtime_sec),
                 }
             )
             warm_components = model.components_.copy()
@@ -580,6 +662,17 @@ class NetworkSparsePCA_ProxQN(NetworkSparsePCA):
 class NetworkSparsePCA_StiefelManifold(NetworkSparsePCA):
     """Multi-component manifold proximal-gradient solver on the Stiefel set."""
 
+    def __init__(
+        self,
+        *args,
+        sparsity_mode: str = "l1",
+        group_lambda: float | None = None,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.sparsity_mode = sparsity_mode
+        self.group_lambda = group_lambda
+
     @staticmethod
     def _sym(M: np.ndarray) -> np.ndarray:
         return 0.5 * (M + M.T)
@@ -593,6 +686,14 @@ class NetworkSparsePCA_StiefelManifold(NetworkSparsePCA):
             Q, _ = np.linalg.qr(Y)
             return Q[:, : Y.shape[1]]
 
+    @staticmethod
+    def _row_group_soft_threshold(M: np.ndarray, threshold: float) -> np.ndarray:
+        norms = np.linalg.norm(M, axis=1, keepdims=True)
+        safe = np.maximum(norms, 1e-12)
+        scale = np.maximum(1.0 - threshold / safe, 0.0)
+        scale[norms <= threshold] = 0.0
+        return M * scale
+
     def _matrix_objective(
         self, Xc: np.ndarray, V: np.ndarray, L: sp.spmatrix | np.ndarray
     ) -> float:
@@ -604,7 +705,12 @@ class NetworkSparsePCA_StiefelManifold(NetworkSparsePCA):
         else:
             LV = np.asarray(L, dtype=float) @ V
         lap_term = float(np.sum(V * LV))
-        val = sigma_term + self.lambda1 * float(np.sum(np.abs(V))) + self.lambda2 * lap_term
+        if self.sparsity_mode == "l21":
+            lam = float(self.group_lambda if self.group_lambda is not None else self.lambda1)
+            penalty = lam * float(np.sum(np.linalg.norm(V, axis=1)))
+        else:
+            penalty = self.lambda1 * float(np.sum(np.abs(V)))
+        val = sigma_term + penalty + self.lambda2 * lap_term
         return float(val) if np.isfinite(val) else float("inf")
 
     def _matrix_grad(
@@ -634,6 +740,8 @@ class NetworkSparsePCA_StiefelManifold(NetworkSparsePCA):
         if L is None:
             L = sp.eye(n_features, format="csr")
 
+        if self.sparsity_mode not in {"l1", "l21"}:
+            raise ValueError("sparsity_mode must be 'l1' or 'l21'.")
         k = min(self.n_components, n_features)
         if init_components is not None:
             init_components = np.asarray(init_components, dtype=float)
@@ -667,7 +775,13 @@ class NetworkSparsePCA_StiefelManifold(NetworkSparsePCA):
             obj_old = self._matrix_objective(Xc, V, L)
             while True:
                 Y = V - eta_trial * riem_grad
-                S = self._soft_threshold(Y, eta_trial * self.lambda1)
+                if self.sparsity_mode == "l21":
+                    lam = float(
+                        self.group_lambda if self.group_lambda is not None else self.lambda1
+                    )
+                    S = self._row_group_soft_threshold(Y, eta_trial * lam)
+                else:
+                    S = self._soft_threshold(Y, eta_trial * self.lambda1)
                 V_trial = self._retract_stiefel(S)
                 if not self.monotone_backtracking:
                     break
@@ -707,3 +821,11 @@ class NetworkSparsePCA_StiefelManifold(NetworkSparsePCA):
         self.history_["step_size_history"] = local_hist_step
         self.history_["rel_change_history"] = local_hist_rel
         return self
+
+
+class NetworkSparsePCA_StiefelStructured(NetworkSparsePCA_StiefelManifold):
+    """Stiefel block solver with row-structured (L2,1) sparsity."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("sparsity_mode", "l21")
+        super().__init__(*args, **kwargs)

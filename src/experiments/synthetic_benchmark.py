@@ -17,6 +17,7 @@ from src.models import (
     NetworkSparsePCA_MASPG_CAR,
     NetworkSparsePCA_ProxQN,
     NetworkSparsePCA_StiefelManifold,
+    NetworkSparsePCA_StiefelStructured,
     PCAEstimator,
     SparsePCA_L1_ProxGrad,
     TorchNetworkSparsePCA,
@@ -401,6 +402,16 @@ def build_baselines(
                 max_iter=max_iter,
                 random_state=random_state,
             )
+            if n_components > 1:
+                baselines["NetSPCA-Stiefel-Structured"] = (
+                    NetworkSparsePCA_StiefelStructured(
+                        n_components=n_components,
+                        lambda1=lambda1,
+                        lambda2=lambda2,
+                        max_iter=max_iter,
+                        random_state=random_state,
+                    )
+                )
         elif backend == "torch-geoopt":
             baselines["NetSPCA-Stiefel"] = TorchNetworkSparsePCA_GeooptStiefel(
                 n_components=n_components,
@@ -495,6 +506,15 @@ def run_benchmark_once(
             "pg_residual_curve": _curve_from_history(
                 estimator, "pg_residual_history_by_component"
             ),
+            "qn_used_curve": _curve_from_history(
+                estimator, "qn_used_history_by_component"
+            ),
+            "qn_accepted_curve": _curve_from_history(
+                estimator, "qn_accepted_history_by_component"
+            ),
+            "qn_fallback_curve": _curve_from_history(
+                estimator, "qn_fallback_history_by_component"
+            ),
         }
         records.append(record)
 
@@ -578,6 +598,8 @@ def summarize_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         residual_last: list[float] = []
         residual_ratio: list[float] = []
         monotone_flags: list[float] = []
+        qn_accept_rates: list[float] = []
+        qn_fallback_rates: list[float] = []
         for r in rows:
             resid_curve = [
                 float(v)
@@ -596,6 +618,23 @@ def summarize_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     for i in range(1, len(obj_curve))
                 )
                 monotone_flags.append(1.0 if mono else 0.0)
+            qn_used = [
+                float(v) for v in (r.get("qn_used_curve") or []) if np.isfinite(float(v))
+            ]
+            qn_acc = [
+                float(v)
+                for v in (r.get("qn_accepted_curve") or [])
+                if np.isfinite(float(v))
+            ]
+            qn_fb = [
+                float(v)
+                for v in (r.get("qn_fallback_curve") or [])
+                if np.isfinite(float(v))
+            ]
+            used = sum(qn_used)
+            if used > 0.0:
+                qn_accept_rates.append(sum(qn_acc) / used)
+                qn_fallback_rates.append(sum(qn_fb) / used)
 
         out["pg_residual_last_mean"] = (
             float(np.mean(residual_last)) if residual_last else float("nan")
@@ -611,6 +650,12 @@ def summarize_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         )
         out["objective_monotone_rate"] = (
             float(np.mean(monotone_flags)) if monotone_flags else float("nan")
+        )
+        out["qn_accept_rate_mean"] = (
+            float(np.mean(qn_accept_rates)) if qn_accept_rates else float("nan")
+        )
+        out["qn_fallback_rate_mean"] = (
+            float(np.mean(qn_fallback_rates)) if qn_fallback_rates else float("nan")
         )
         summary.append(out)
 

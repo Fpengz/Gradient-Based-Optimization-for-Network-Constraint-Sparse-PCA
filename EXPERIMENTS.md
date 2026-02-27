@@ -54,10 +54,12 @@
   - `NetSPCA-PG` for theorem-aligned convergence analysis.
   - `NetSPCA-MASPG-CAR` for practical iteration/runtime reduction.
   - `NetSPCA-ProxQN` for faster practical convergence in moderate/high-dimensional settings.
+  - `NetSPCA-Stiefel-Structured` (when `n_components > 1`) for row-sparse shared supports across components.
 - Track all of:
   - `objective_curve`
   - `pg_residual_curve`
   - `rel_change_curve`
+  - `qn_accepted_curve` / `qn_fallback_curve` (for ProxQN stability diagnostics)
 
 ## Outputs for paper writing
 

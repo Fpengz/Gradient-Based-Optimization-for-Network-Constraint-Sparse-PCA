@@ -5,6 +5,7 @@ from src.models import (
     NetworkSparsePCA,
     NetworkSparsePCA_ProxQN,
     NetworkSparsePCA_StiefelManifold,
+    NetworkSparsePCA_StiefelStructured,
     NetworkSparsePCA_MASPG_CAR,
     PCAEstimator,
     SparsePCA_L1_ProxGrad,
@@ -84,6 +85,9 @@ def test_network_sparse_pca_proxqn_api():
     hist = proxqn.history_
     assert "pg_residual_history_by_component" in hist
     assert len(hist["pg_residual_history_by_component"]) == 1
+    assert "qn_used_history_by_component" in hist
+    assert "qn_accepted_history_by_component" in hist
+    assert "qn_fallback_history_by_component" in hist
 
 
 def test_network_sparse_pca_handles_disconnected_graph():
@@ -114,6 +118,21 @@ def test_network_sparse_pca_stiefel_multi_component_api():
     assert np.allclose(gram, np.eye(3), atol=5e-3)
 
 
+def test_network_sparse_pca_stiefel_structured_multi_component_api():
+    X = _toy_data()
+    graph = chain_graph(X.shape[1])
+    model = NetworkSparsePCA_StiefelStructured(
+        n_components=3,
+        max_iter=30,
+        tol=1e-4,
+        random_state=0,
+    ).fit(X, graph=graph)
+    _assert_common_attrs(model)
+    assert model.components_.shape == (3, 10)
+    gram = model.components_ @ model.components_.T
+    assert np.allclose(gram, np.eye(3), atol=1e-2)
+
+
 def test_network_sparse_pca_fit_path_returns_warm_started_models():
     X = _toy_data()
     graph = chain_graph(X.shape[1])
@@ -127,6 +146,7 @@ def test_network_sparse_pca_fit_path_returns_warm_started_models():
     assert len(path) == 4
     assert all("lambda1" in row and "lambda2" in row for row in path)
     assert all("model" in row for row in path)
+    assert all("runtime_sec" in row for row in path)
     assert all(path[i]["warm_started"] for i in range(1, len(path)))
 
 

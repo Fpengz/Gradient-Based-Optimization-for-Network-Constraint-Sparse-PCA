@@ -19,6 +19,13 @@ All notable changes to this project are documented in this file.
 - Proximal quasi-Newton NC-SPCA variant:
   - `NetworkSparsePCA_ProxQN`
   - baseline key: `NetSPCA-ProxQN`
+- ProxQN diagnostics:
+  - `qn_used_curve`
+  - `qn_accepted_curve`
+  - `qn_fallback_curve`
+  - summary fields: `qn_accept_rate_mean`, `qn_fallback_rate_mean`
+- Structured multi-component Stiefel solver:
+  - `NetworkSparsePCA_StiefelStructured` (`L2,1` row sparsity)
 - Audit and certification reports:
   - `IMPLEMENTATION_MAP.md`
   - `AUDIT_REPORT_METHOD.md`
@@ -37,6 +44,8 @@ All notable changes to this project are documented in this file.
 - Synthetic/real benchmark fitting now passes `graph` when estimator supports it (fixes torch graph-method wiring).
 - Added random geometric graph (RGG) support to graph generators and synthetic protocol.
 - `fit_path` continuation now supports warm-start-friendly serpentine ordering (`ordering="serpentine"`).
+- `scripts/run_sweep.py` now runs NetSPCA sweep grids through `fit_path(ordering="serpentine")` with warm starts per repeat.
+- ProxQN now uses orthant-aware updates, stronger descent safeguards, and active-set restricted refinement.
 
 ### Fixed
 - MASPG-CAR backtracking alignment with smooth-majorization test and monotone restart safeguards.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+from time import perf_counter
 from typing import Any
 
 import numpy as np
@@ -315,7 +316,9 @@ class TorchNetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin
             params["lambda1"] = float(l1)
             params["lambda2"] = float(l2)
             model = self.__class__(**params)
+            tic = perf_counter()
             model.fit(X, L=L, graph=graph, init_components=warm)
+            runtime_sec = perf_counter() - tic
             path.append(
                 {
                     "lambda1": float(l1),
@@ -323,6 +326,7 @@ class TorchNetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin
                     "model": model,
                     "warm_started": warm is not None,
                     "converged": bool(model.converged_),
+                    "runtime_sec": float(runtime_sec),
                 }
             )
             warm = model.components_.copy()

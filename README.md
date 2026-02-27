@@ -169,6 +169,8 @@ Torch side-by-side backends are available as:
 - `TorchNetworkSparsePCA` (single-component PG/MASPG-CAR style)
 - `TorchNetworkSparsePCA_GeooptStiefel` (multi-component Stiefel manifold)
 
+For multi-component row-structured sparsity, `NetworkSparsePCA_StiefelStructured` provides an `L2,1`-regularized block update on the Stiefel manifold.
+
 ---
 
 ## References

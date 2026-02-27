@@ -9,12 +9,20 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from src.experiments.synthetic_benchmark import (
+    _perturb_graph_for_misspecification,
     SyntheticBenchmarkConfig,
     build_baselines,
-    run_repeated_benchmark,
+    generate_graph_structured_data,
+)
+from src.utils.metrics import (
+    connected_support_lcc_ratio,
+    explained_variance,
+    laplacian_energy,
+    support_metrics,
 )
 
 
@@ -29,6 +37,39 @@ def _to_df(records: list[dict[str, Any]]) -> pd.DataFrame:
             ["NetSPCA-PG", "NetSPCA-MASPG-CAR", "NetSPCA-ProxQN"]
         )
     ].copy()
+
+
+def _first_component(model: Any) -> np.ndarray:
+    comp = np.asarray(model.components_, dtype=float)
+    if comp.ndim != 2 or comp.shape[0] == 0:
+        raise ValueError("Model does not expose a valid components_ matrix.")
+    return comp[0]
+
+
+def _sanitize_component(component: np.ndarray) -> np.ndarray:
+    w = np.asarray(component, dtype=float).reshape(-1)
+    if not np.all(np.isfinite(w)):
+        return np.zeros_like(w)
+    norm = np.linalg.norm(w)
+    if norm < 1e-12:
+        return np.zeros_like(w)
+    return w / norm
+
+
+def _estimated_support(
+    component: np.ndarray,
+    support_threshold: float,
+    relative_threshold: float = 1e-3,
+) -> np.ndarray:
+    w = np.asarray(component, dtype=float).reshape(-1)
+    if w.size == 0:
+        return np.array([], dtype=int)
+    abs_w = np.abs(w)
+    scale = float(abs_w.max())
+    if not np.isfinite(scale) or scale <= 0.0:
+        return np.array([], dtype=int)
+    threshold = max(float(support_threshold), float(relative_threshold) * scale)
+    return np.flatnonzero(abs_w > threshold)
 
 
 def _plot_sweep(df: pd.DataFrame, outdir: Path) -> None:
@@ -142,33 +183,72 @@ def main() -> None:
         cfg.graph_misspec_rate = float(args.graph_misspec_rate)
 
     all_records: list[dict[str, Any]] = []
-    for lambda1 in lambda1_grid:
-        for lambda2 in lambda2_grid:
-            methods = build_baselines(
-                lambda1=lambda1,
-                lambda2=lambda2,
-                max_iter=args.max_iter,
-                random_state=args.seed,
-                n_components=args.n_components,
-                backend=args.backend,
-                torch_device=args.torch_device,
-                torch_dtype=args.torch_dtype,
+    for rep in range(args.n_repeats):
+        rep_seed = args.seed + rep
+        sample = generate_graph_structured_data(cfg, random_state=rep_seed)
+        X = sample["X"]
+        graph = sample["graph"]
+        if cfg.graph_misspec_rate > 0.0:
+            graph = _perturb_graph_for_misspecification(
+                graph,
+                perturb_rate=cfg.graph_misspec_rate,
+                random_state=rep_seed,
             )
-            methods = {
-                "NetSPCA-PG": methods["NetSPCA-PG"],
-                "NetSPCA-MASPG-CAR": methods["NetSPCA-MASPG-CAR"],
-                "NetSPCA-ProxQN": methods["NetSPCA-ProxQN"],
-            }
-            records = run_repeated_benchmark(
-                cfg=cfg,
-                methods=methods,
-                n_repeats=args.n_repeats,
-                base_seed=args.seed,
+        w_true = sample["w_true"]
+        true_support = np.flatnonzero(np.abs(w_true) > cfg.support_threshold)
+
+        base_methods = build_baselines(
+            lambda1=min(lambda1_grid),
+            lambda2=min(lambda2_grid),
+            max_iter=args.max_iter,
+            random_state=rep_seed,
+            n_components=args.n_components,
+            backend=args.backend,
+            torch_device=args.torch_device,
+            torch_dtype=args.torch_dtype,
+        )
+        methods = {
+            "NetSPCA-PG": base_methods["NetSPCA-PG"],
+            "NetSPCA-MASPG-CAR": base_methods["NetSPCA-MASPG-CAR"],
+            "NetSPCA-ProxQN": base_methods["NetSPCA-ProxQN"],
+        }
+
+        for method_name, estimator in methods.items():
+            if not hasattr(estimator, "fit_path"):
+                continue
+            path = estimator.fit_path(
+                X,
+                graph=graph,
+                lambda1_grid=lambda1_grid,
+                lambda2_grid=lambda2_grid,
+                ordering="serpentine",
             )
-            for row in records:
-                row["lambda1"] = lambda1
-                row["lambda2"] = lambda2
-            all_records.extend(records)
+            for node in path:
+                model = node["model"]
+                w_hat = _sanitize_component(_first_component(model))
+                est_support = _estimated_support(
+                    w_hat, support_threshold=cfg.support_threshold
+                )
+                s_metrics = support_metrics(est_support, true_support)
+                all_records.append(
+                    {
+                        "method": method_name,
+                        "lambda1": float(node["lambda1"]),
+                        "lambda2": float(node["lambda2"]),
+                        "explained_variance": explained_variance(X, w_hat),
+                        "f1": float(s_metrics["f1"]),
+                        "precision": float(s_metrics["precision"]),
+                        "recall": float(s_metrics["recall"]),
+                        "lcc_ratio": connected_support_lcc_ratio(
+                            est_support, graph.adjacency
+                        ),
+                        "laplacian_energy": laplacian_energy(w_hat, graph.laplacian),
+                        "support_size": int(est_support.size),
+                        "runtime_sec": float(node.get("runtime_sec", np.nan)),
+                        "repeat": rep,
+                        "seed": rep_seed,
+                    }
+                )
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     outdir = Path(args.output_dir) / f"synth-sweep-{stamp}"

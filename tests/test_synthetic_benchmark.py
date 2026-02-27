@@ -135,6 +135,7 @@ def test_build_baselines_can_include_stiefel_solver():
         include_stiefel_manifold=True,
     )
     assert "NetSPCA-Stiefel" in methods
+    assert "NetSPCA-Stiefel-Structured" in methods
 
 
 def test_build_baselines_includes_proxqn_numpy():
@@ -186,3 +187,15 @@ def test_summarize_records_includes_stationarity_fields():
     assert "pg_residual_last_mean" in row
     assert "pg_residual_ratio_mean" in row
     assert "objective_monotone_rate" in row
+
+
+def test_summarize_records_includes_proxqn_diagnostics():
+    cfg = SyntheticBenchmarkConfig(
+        n_samples=36, n_features=16, support_size=4, random_state=12
+    )
+    methods = {"NetSPCA-ProxQN": build_baselines(max_iter=25)["NetSPCA-ProxQN"]}
+    records = run_repeated_benchmark(cfg=cfg, methods=methods, n_repeats=2, base_seed=12)
+    summary = summarize_records(records)
+    row = summary[0]
+    assert "qn_accept_rate_mean" in row
+    assert "qn_fallback_rate_mean" in row

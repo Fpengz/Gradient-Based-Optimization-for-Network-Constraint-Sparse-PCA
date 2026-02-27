@@ -164,6 +164,7 @@ Outputs include stationarity diagnostics in `summary.csv`:
 - `pg_residual_last_mean`
 - `pg_residual_ratio_mean`
 - `objective_monotone_rate`
+- `qn_accept_rate_mean` / `qn_fallback_rate_mean` (for ProxQN runs)
 
 ## Validation checks
 
