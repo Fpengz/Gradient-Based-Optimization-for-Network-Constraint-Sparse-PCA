@@ -16,10 +16,6 @@
 - **Fidelity**: Uses `sklearn.linear_model.ElasticNet` which is a robust solver for the subproblem.
 - **Discrepancy**: The normalization of loadings $B$ follows the common practice of unit-norm vectors, but the original paper has a "v-style" and "beta-style" normalization which can differ in scale.
 
-### GradFPS (`GradFPS`)
-- **Mathematical Alignment**: Implements the Fantope Projection and Selection correctly.
-- **Fidelity**: The eigenvalue clipping for Fantope projection $\{X : 0 \preceq X \preceq I, 	ext{tr}(X) = d\}$ is implemented via a root-finding method for the Lagrange multiplier, which is the standard approach.
-
 ### GPM (`GeneralizedPowerMethod`)
 - **Mathematical Alignment**: Correctly implements the single-unit GPower algorithm from Journée et al. (2010).
 
@@ -31,7 +27,6 @@
 |-----------|--------------------------|-------------|
 | **NC-SPCA** | $O(np + |E|)$ | High (linear in $p$ if $L$ is sparse) |
 | **Zou-SPCA**| $O(n p^2)$ (due to ENET) | Medium |
-| **GradFPS** | $O(p^3)$ (due to EVD) | Low |
 | **GPM**     | $O(np)$ | High |
 
 *Note: $|E|$ is the number of edges in the feature graph.*
@@ -43,7 +38,6 @@
 1. **NC-SPCA Step Size**: While `auto` estimation provides a safe upper bound ($L_f \le 2\|\Sigma\|_2 + 2\lambda_2 \|L\|_2$), it can be conservative. **Backtracking line search** would allow for larger steps and faster convergence.
 2. **Sparse Laplacian**: Ensure that $L$ is always passed as a `scipy.sparse` matrix for high-dimensional feature graphs to maintain $O(|E|)$ complexity.
 3. **Deflation**: For multi-component SPCA, the current deflation $X \leftarrow X - Xww^	op$ does not guarantee the best sparse basis. **Projection-based deflation** (Mackey, 2009) or **simultaneous optimization** (block-coordinate descent on the Stiefel manifold) could improve results for $k > 1$.
-4. **GradFPS**: For large $p$, the full EVD in every iteration is the bottleneck. If $d \ll p$, one could theoretically use a **truncated EVD**, but the trace constraint $	ext{tr}(X)=d$ technically requires knowing all eigenvalues. However, for the $L_1$-regularized case, many eigenvalues of the optimal $X$ are 0 or 1, which might be exploitable.
 
 ---
 

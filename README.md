@@ -85,6 +85,20 @@ CI is configured in `.github/workflows/ci.yml` and runs:
 - `uv run black --check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests`
 - `uv run pytest -q`
 
+## 🔒 Pre-commit Hook
+
+Install the local git hook:
+
+```bash
+bash scripts/install_git_hooks.sh
+```
+
+The hook runs on every commit:
+
+- `uv run ty check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests`
+- `uv run ruff check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests`
+- `uv run pytest -q`
+
 ---
 
 ## Core Motivation

@@ -96,7 +96,8 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
 
             norm_L = float(eigsh(L, k=1, which="LM", return_eigenvectors=False)[0])
         else:
-            norm_L = float(np.linalg.norm(L, 2))
+            L_dense = np.asarray(L, dtype=float)
+            norm_L = float(np.linalg.norm(L_dense, 2))
         return 2.0 * norm_sigma + 2.0 * self.lambda2 * norm_L
 
     def _smooth_grad(
@@ -107,7 +108,11 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
     ) -> np.ndarray:
         n = Xc.shape[0]
         grad_sigma = -2.0 / n * (Xc.T @ (Xc @ w))
-        grad_L = 2.0 * self.lambda2 * (L @ w if sp.issparse(L) else np.dot(L, w))
+        if sp.issparse(L):
+            grad_L = 2.0 * self.lambda2 * (L @ w)
+        else:
+            L_dense = np.asarray(L, dtype=float)
+            grad_L = 2.0 * self.lambda2 * (L_dense @ w)
         return grad_sigma + np.asarray(grad_L).reshape(-1)
 
     def _objective(
@@ -118,7 +123,8 @@ class NetworkSparsePCA(BaseEstimator, TransformerMixin, EstimatorStateMixin):
         if sp.issparse(L):
             lap = float(w @ (L @ w))
         else:
-            lap = float(w @ np.dot(L, w))
+            L_dense = np.asarray(L, dtype=float)
+            lap = float(w @ (L_dense @ w))
         return float(
             sigma_term + self.lambda1 * np.linalg.norm(w, 1) + self.lambda2 * lap
         )

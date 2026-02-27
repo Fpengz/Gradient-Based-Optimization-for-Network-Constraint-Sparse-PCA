@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+echo "[pre-commit] running ty..."
+uv run ty check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests
+
+echo "[pre-commit] running ruff..."
+uv run ruff check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests
+
+echo "[pre-commit] running pytest..."
+uv run pytest -q
+
+echo "[pre-commit] all checks passed."

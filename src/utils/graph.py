@@ -20,7 +20,7 @@ class GraphData:
 
 def _to_csr(matrix: sp.spmatrix | np.ndarray) -> sp.csr_matrix:
     if sp.issparse(matrix):
-        return matrix.tocsr()
+        return sp.csr_matrix(matrix)
     return sp.csr_matrix(np.asarray(matrix, dtype=float))
 
 

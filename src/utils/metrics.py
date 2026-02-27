@@ -72,6 +72,7 @@ def connected_support_lcc_ratio(
         if sp.issparse(adjacency)
         else sp.csr_matrix(np.asarray(adjacency, dtype=float))
     )
+    A = sp.csr_matrix(A)
     sub = A[support][:, support]
     n_comp, labels = connected_components(sub, directed=False, return_labels=True)
     if n_comp == 0:

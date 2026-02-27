@@ -75,6 +75,6 @@ This executes synthetic comparison, synthetic sweep, and colon comparison in seq
 
 ```bash
 uv run pytest -q
-uv run ruff check .
-uv run black --check .
+uv run ruff check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests
+uv run black --check src/experiments src/models src/utils scripts/run_experiment.py scripts/run_sweep.py scripts/reproduce_figures.py tests
 ```
