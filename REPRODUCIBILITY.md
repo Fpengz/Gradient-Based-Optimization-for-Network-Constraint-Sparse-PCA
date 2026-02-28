@@ -112,6 +112,14 @@ uv run python scripts/reproduce_figures.py
 
 This executes synthetic comparison, synthetic sweep, and colon comparison in sequence.
 
+## Convexity and objective visualizations
+
+```bash
+uv run python scripts/convexity_and_objectives.py
+```
+
+Outputs are written to `figures/convexity_and_objectives/` by default.
+
 ## Backend comparison (implementation backend parity)
 
 ```bash

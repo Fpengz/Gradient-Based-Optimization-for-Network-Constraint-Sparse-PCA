@@ -96,6 +96,11 @@ This project uses `uv` for modern, fast Python package management.
     uv run python scripts/reproduce_paper_artifacts.py
     ```
 
+*   **Objective and convexity visualizations:**
+    ```bash
+    uv run python scripts/convexity_and_objectives.py
+    ```
+
 ---
 
 ## 🛠 Implemented Algorithms
