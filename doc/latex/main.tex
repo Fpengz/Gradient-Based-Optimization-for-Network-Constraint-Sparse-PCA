@@ -1,11 +1,12 @@
-\documentclass[11pt]{article}
+\documentclass[10pt,twocolumn,letterpaper]{article}
 
 % =========================
 % Packages
 % =========================
-\usepackage[margin=1in]{geometry}
+\usepackage[margin=0.75in]{geometry}
 \usepackage{amsmath, amssymb, amsthm}
 \usepackage{mathtools}
+\usepackage{microtype}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{multirow}
@@ -36,22 +37,27 @@
 \DeclareMathOperator{\supp}{supp}
 \DeclareMathOperator{\tr}{tr}
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\setlength{\columnsep}{0.25in}
+\setlength{\emergencystretch}{3em}
+\hbadness=10000
 
 % =========================
 % Title
 % =========================
-\title{Network-Constrained Sparse Principal Component Analysis: Geometric Regularization and Scalable Optimization}
+\title{\texorpdfstring{Network-Constrained Sparse Principal Component Analysis: Geometric Regularization and Scalable Optimization}{Network-Constrained Sparse Principal Component Analysis: Geometric Regularization and Scalable Optimization}}
 \author{Wang Zhoufu}
 \date{}
 
 \begin{document}
+\sloppy
+\raggedbottom
 \maketitle
 
 % =========================
 % Abstract
 % =========================
 \begin{abstract}
-Sparse principal component analysis (SPCA) improves interpretability by inducing sparse loadings, but standard formulations often treat features as exchangeable and ignore known relational structure. In many applications---including genomics, sensor networks, and finance---features are naturally coupled by an underlying graph. We study a network-constrained SPCA formulation that augments variance maximization with an $\ell_1$ sparsity penalty and a graph-Laplacian smoothness regularizer. For the single-component problem with a unit $\ell_2$-ball constraint, we derive a first-order method that is an exact proximal-gradient scheme for a nonconvex smooth term plus a convex nonsmooth term (including the ball indicator), with a closed-form proximal map given by soft-thresholding followed by radial projection. We establish a standard convergence guarantee to critical points under Lipschitz-gradient assumptions and discuss why multi-component extensions require manifold-aware proximal methods on the Stiefel manifold.
+Sparse principal component analysis (SPCA) improves interpretability by inducing sparse loadings, but standard formulations often treat features as exchangeable and ignore known relational structure. In many applications, including genomics, sensor networks, and finance, features are coupled by an underlying graph. We study a network-constrained SPCA formulation that combines variance maximization with an $\ell_1$ sparsity penalty and a graph Laplacian smoothness regularizer. For the single-component problem with a unit $\ell_2$ ball constraint, we derive an exact proximal-gradient method for a nonconvex smooth term plus a convex nonsmooth term, including the ball indicator. The resulting proximal map has the closed form soft-thresholding followed by radial projection. Under Lipschitz continuity of the smooth gradient, the method converges to critical points in the standard nonconvex composite sense. We also explain why multi-component extensions require manifold-aware proximal methods. Empirically, the method should be viewed as conditionally useful: structural gains depend on graph quality and can deteriorate under misspecification.
 \end{abstract}
 
 % =========================
@@ -62,7 +68,7 @@ Modern scientific and industrial datasets are routinely high-dimensional, with f
 
 Sparse principal component analysis (SPCA) addresses this limitation by promoting sparse loadings, typically via $\ell_1$-type penalties or related sparsity-inducing regularizers. Sparsity improves interpretability by selecting a subset of variables and can reduce acquisition or monitoring costs. However, standard SPCA often treats features as exchangeable and ignores known relational structure. In many domains, this is a poor inductive bias: genes interact through pathways and regulatory networks, financial assets are coupled by sectors and supply chains, and sensors lie on physical geometries with local signal propagation. Purely sparse solutions may therefore produce fragmented supports that are statistically plausible but structurally implausible.
 
-This paper studies \emph{network-constrained sparse PCA}, which augments SPCA with a graph Laplacian regularizer to encourage loadings that are simultaneously sparse and smooth over a feature graph. The Laplacian term penalizes local variation across graph edges, promoting coherent selections when the graph is informative. Our focus is twofold: (i) a single-component formulation with a unit $\ell_2$-ball constraint and an exact proximal-gradient algorithm, and (ii) a scoped discussion of how the optimization landscape changes in multi-component extensions with orthogonality constraints.
+This paper studies \emph{network-constrained sparse PCA}, which augments SPCA with a graph Laplacian regularizer to encourage loadings that are simultaneously sparse and smooth over a feature graph. The Laplacian term penalizes local variation across graph edges and therefore favors coherent selections when the graph is informative. Our focus is twofold: (i) a single-component formulation with a unit $\ell_2$ ball constraint and an exact proximal-gradient algorithm, and (ii) a scoped discussion of how the optimization landscape changes in multi-component extensions with orthogonality constraints.
 
 \paragraph{Contributions.}
 Our main contributions are as follows:
@@ -70,7 +76,7 @@ Our main contributions are as follows:
   \item We formulate a graph-regularized SPCA objective that combines variance maximization, $\ell_1$ sparsity, and Laplacian smoothness under an $\ell_2$-ball constraint.
   \item We derive a simple and scalable proximal gradient algorithm and show that the update ``soft-thresholding + radial projection'' is the \emph{exact} proximal operator of $\lambda_1\|w\|_1 + I_{\mathbb{B}_2}(w)$.
   \item We provide a standard convergence guarantee to critical points for the resulting nonconvex composite problem using the exact composite proximal map.
-  \item We empirically evaluate structured feature selection on synthetic graph families and demonstrate improved connected-support recovery relative to unstructured baselines.
+  \item We empirically evaluate structured feature selection on synthetic graph families and identify the regimes in which graph regularization helps or hurts support recovery.
 \end{itemize}
 
 % =========================
@@ -78,21 +84,21 @@ Our main contributions are as follows:
 % =========================
 \section{Related Work}
 \paragraph{Sparse PCA formulations.}
-A large literature studies SPCA through penalized variance maximization, regression-based formulations, and convex relaxations; see, e.g., overview discussions in \cite{zou2018overviewSPCA}. Iterative thresholding methods such as the generalized power method provide efficient schemes for certain SPCA objectives, with strong empirical performance \cite{journee2008gpower}.
+A large literature studies SPCA through penalized variance maximization, regression-based formulations, matrix decomposition viewpoints, and convex relaxations; see, e.g., the original regression-based SPCA formulation in \cite{zou2006spca}, penalized matrix decomposition in \cite{witten2009pmd}, semidefinite relaxations in \cite{daspremont2007dspca}, and overview discussions in \cite{zou2018overviewSPCA}. Iterative thresholding methods such as the generalized power method provide efficient schemes for certain SPCA objectives, with strong empirical performance \cite{journee2010gpower}.
 
 \paragraph{First-order and proximal methods.}
-Motivated by scalability, recent work has emphasized first-order algorithms and proximal frameworks for structured or constrained variants of SPCA \cite{qiu2019gradientSPCAarxiv,qiu2023biometrikaGradientSPCA}. Proximal gradient methods are particularly appealing for objectives comprising a smooth term plus a nonsmooth sparsity term, as the $\ell_1$ proximal operator admits a closed-form soft-thresholding map.
+Motivated by scalability, recent work has emphasized first-order algorithms and proximal frameworks for structured or constrained variants of SPCA \cite{qiu2023biometrikaGradientSPCA}. Proximal gradient methods are particularly appealing for objectives comprising a smooth term plus a nonsmooth sparsity term, as the $\ell_1$ proximal operator admits a closed-form soft-thresholding map.
 
 \paragraph{Graph-aware and network-constrained representations.}
-Graph-regularized dimensionality reduction introduces Laplacian penalties to preserve geometric and relational structure. In biological and other networked settings, incorporating feature graphs has been shown to improve interpretability and scientific validity by selecting coherent modules rather than isolated variables \cite{miao2022genomeNetworkSPCA}. Our formulation is aligned with this perspective and focuses on a direct proximal-gradient treatment of a Laplacian-regularized SPCA objective under a simple norm constraint.
+Graph-regularized dimensionality reduction introduces Laplacian penalties to preserve geometric and relational structure. In biological and other networked settings, incorporating feature graphs has been shown to improve interpretability and scientific validity by selecting coherent modules rather than isolated variables \cite{miao2022genomeNetworkSPCA}. Our formulation is aligned with this perspective and focuses on a direct proximal-gradient treatment of a Laplacian-regularized SPCA objective under a simple norm constraint. Relative to application-specific graph PCA variants, the emphasis here is on an exact composite proximal map for the single-component objective and a careful separation between theorem-backed and practical solver variants.
 
 \paragraph{Manifold-constrained sparse components.}
-For multi-component sparse PCA, orthogonality constraints introduce a Stiefel-manifold geometry. In that setting, naive thresholding followed by orthogonal projection can destroy sparsity patterns, motivating manifold proximal-gradient methods that combine tangent-space proximal subproblems with retraction steps \cite{chen2020manpg,chen2020amanpg,chen2024manpgsurvey}. We do not re-derive those algorithms here, but we use them as the conceptual extension of our single-component analysis.
+For multi-component sparse PCA, orthogonality constraints introduce Stiefel manifold geometry. In that setting, naive thresholding followed by orthogonal projection can destroy sparsity patterns, motivating manifold proximal-gradient methods that combine tangent-space proximal subproblems with retraction steps \cite{chen2020manpg,chen2020amanpg,chen2024manpgsurvey}. We do not re-derive those algorithms here, but we use them as the conceptual extension of our single-component analysis.
 
 \subsection{Algorithmic Positioning and Comparison}
 Table~\ref{tab:algorithm_comparison} summarizes how the proposed algorithm differs from representative SPCA solvers in objective structure, constraint geometry, and update design.
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering
 \caption{Positioning of the proposed algorithm relative to representative SPCA methods.}
 \label{tab:algorithm_comparison}
@@ -103,14 +109,14 @@ Table~\ref{tab:algorithm_comparison} summarizes how the proposed algorithm diffe
 \toprule
 Method family & Typical setting / update style & Key difference vs.\ this paper \\
 \midrule
-Generalized power / thresholding methods \cite{journee2008gpower} & Euclidean, formulation-specific power updates with truncation/thresholding & Fast and effective, but typically tied to specific SPCA objectives rather than the exact graph-composite proximal formulation analyzed here. \\
-Gradient-based SPCA methods \cite{qiu2019gradientSPCAarxiv,qiu2023biometrikaGradientSPCA} & Euclidean first-order methods tailored to SPCA formulations (including scalable/online settings) & Close in spirit (first-order scalability), but not the same Laplacian-regularized, unit-ball-constrained composite problem with an exact closed-form composite prox step. \\
+Generalized power / thresholding methods \cite{journee2010gpower} & Euclidean, formulation-specific power updates with truncation/thresholding & Fast and effective, but typically tied to specific SPCA objectives rather than the exact graph-composite proximal formulation analyzed here. \\
+Gradient-based SPCA methods \cite{qiu2023biometrikaGradientSPCA} & Euclidean first-order methods tailored to SPCA formulations (including scalable or online settings) & Close in spirit (first-order scalability), but not the same Laplacian-regularized, unit-ball-constrained composite problem with an exact closed-form composite prox step. \\
 Graph-regularized PCA/SPCA variants \cite{miao2022genomeNetworkSPCA} & Graph-aware objectives often solved by alternating or problem-specific schemes & Similar structural prior, but solver design and guarantees depend on the exact application formulation; this paper emphasizes a clean proximal-gradient derivation and theorem for the single-component case. \\
-ManPG / A-ManPG \cite{chen2020manpg,chen2020amanpg} & Stiefel-manifold optimization with tangent-space proximal subproblems and retractions & Natural extension for multi-component sparse orthogonal factors. More general for $V^\top V=I_k$, but more complex than the single-component Euclidean algorithm studied here. \\
+ManPG / A-ManPG \cite{chen2020manpg,chen2020amanpg} & Stiefel manifold optimization with tangent-space proximal subproblems and retractions & Natural extension for multi-component sparse orthogonal factors. More general for $V^\top V=I_k$, but more complex than the single-component Euclidean algorithm studied here. \\
 \textbf{This paper (single component)} & Euclidean optimization with a unit $\ell_2$-ball constraint and graph Laplacian regularization & Exact composite proximal-gradient update (soft-thresholding + radial projection), simple implementation, and a direct convergence-to-critical-points guarantee for the stated single-component objective. \\
 \bottomrule
 \end{tabularx}
-\end{table}
+\end{table*}
 
 % =========================
 % 3. Problem Setup
@@ -120,7 +126,7 @@ Let $X\in\R^{n\times p}$ be centered. The sample covariance is
 \begin{equation}
   \Sigmahat = \frac{1}{n}X^\top X.
 \end{equation}
-Let $G=(V,E)$ be a weighted undirected graph over features, with $|V|=p$, adjacency weights $\{a_{ij}\}_{(i,j)\in E}$, degree matrix $D$, and graph Laplacian $L=D-W$ (or a normalized Laplacian, when appropriate). The graph encodes prior knowledge of feature relationships.
+Let $G=(V,E)$ be a weighted undirected graph over features, with $|V|=p$, adjacency weights $\{a_{ij}\}_{(i,j)\in E}$, degree matrix $D$, and graph Laplacian $L=D-W$. Unless stated otherwise, we use this combinatorial Laplacian in both optimization and reporting. If a normalized Laplacian is used in a variant experiment, that choice should be stated explicitly because it changes both the smooth term and the reported Laplacian energy. The graph encodes prior knowledge of feature relationships.
 
 Our goal is to learn a single sparse loading vector $w\in\R^p$ that explains variance while respecting graph structure.
 
@@ -136,7 +142,8 @@ This perspective is standard in spectral graph theory and graph signal processin
 \centering
 \caption{Core notation used throughout the paper.}
 \label{tab:notation}
-\begin{tabular}{ll}
+\small
+\begin{tabularx}{\columnwidth}{@{}lY@{}}
 \toprule
 Symbol & Meaning \\
 \midrule
@@ -152,13 +159,14 @@ $V\in\R^{p\times k}$ & multi-component loading matrix \\
 $\lambda_1,\lambda_2$ & sparsity and graph-smoothness regularization parameters \\
 $\mathbb{B}_2$ & unit $\ell_2$ ball in $\R^p$ \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
+\normalsize
 \end{table}
 
 % =========================
 % 4. Objective
 % =========================
-\section{Network-Constrained SPCA Objective}
+\section{\texorpdfstring{Network-Constrained SPCA\\ Objective}{Network-Constrained SPCA Objective}}
 We consider the constrained optimization problem
 \begin{equation}
 \label{eq:main_obj}
@@ -283,11 +291,11 @@ For completeness, the $\ell_1$ proximal operator is
 \paragraph{Practical step sizes.}
 For quadratics, $\nabla f$ is Lipschitz with constant $L_f = 2\|-\Sigmahat + \lambda_2 L\|_2$, so $\eta\in(0,1/L_f]$ is sufficient. In practice, $\eta$ can be selected by backtracking line search to ensure monotone descent of $F$.
 
-\subsection{Practical Accelerated Variant (MASPG-CAR)}
-Algorithm~\ref{alg:pg} is a clean baseline and the basis of our formal convergence result. For practical large-scale tuning and repeated solves across many regularization pairs, we recommend an enhanced variant that preserves the same exact composite proximal map while improving wall-clock efficiency.
+\subsection{\texorpdfstring{Practical Accelerated Variant\\ (MASPG-CAR)}{Practical Accelerated Variant (MASPG-CAR)}}
+Algorithm~\ref{alg:pg} is a clean baseline and the basis of our formal convergence result. For practical large-scale tuning and repeated solves across many regularization pairs, we recommend an enhanced variant that preserves the same exact composite proximal map while often improving wall-clock efficiency in practice.
 
 \paragraph{Design principles.}
-The practical variant combines: (i) spectral (Barzilai--Borwein) step-size initialization, (ii) monotone inertial extrapolation with restart, (iii) continuation/warm starts over $(\lambda_1,\lambda_2)$, and (iv) optional active-set restricted refinement once support stabilizes. These modifications are standard acceleration heuristics in first-order optimization, but we present them as a \emph{practical} solver variant rather than as a replacement for the theorem-backed baseline.
+The practical variant combines: (i) spectral (Barzilai--Borwein) step-size initialization, (ii) monotone inertial extrapolation with restart, (iii) continuation or warm starts over $(\lambda_1,\lambda_2)$, and (iv) optional active-set restricted refinement once support stabilizes. These modifications are standard acceleration heuristics in first-order optimization, but we present them as a \emph{practical} solver variant rather than as a replacement for the theorem-backed baseline.
 
 \paragraph{Concrete choices (recommended defaults).}
 Let $d^k=w^k-w^{k-1}$ and $r^k=\nabla f(w^k)-\nabla f(w^{k-1})$. A practical BB initialization is
@@ -296,7 +304,11 @@ Let $d^k=w^k-w^{k-1}$ and $r^k=\nabla f(w^k)-\nabla f(w^{k-1})$. A practical BB 
 \end{equation}
 when $\langle d^k,r^k\rangle>0$, with fallback to the previous accepted step otherwise. We recommend a smooth-majorization backtracking test of the form
 \begin{equation}
-f(w_{\mathrm{trial}}^{k+1}) \le f(y^k) + \langle \nabla f(y^k), w_{\mathrm{trial}}^{k+1}-y^k\rangle + \frac{1}{2\eta_k}\|w_{\mathrm{trial}}^{k+1}-y^k\|_2^2,
+\begin{aligned}
+f(w_{\mathrm{trial}}^{k+1}) \le\; & f(y^k)
+ + \langle \nabla f(y^k), w_{\mathrm{trial}}^{k+1}-y^k\rangle \\
+& + \frac{1}{2\eta_k}\|w_{\mathrm{trial}}^{k+1}-y^k\|_2^2,
+\end{aligned}
 \end{equation}
 which is guaranteed for sufficiently small $\eta_k$ under the Lipschitz-gradient assumption. Because inertial extrapolation can produce infeasible $y^k\notin\mathbb{B}_2$, we apply this test only to the smooth part $f$. In practice, we additionally enforce a monotonicity safeguard $F(w_{\mathrm{trial}}^{k+1})\le F(w^k)$ via restart.
 
@@ -335,7 +347,9 @@ Algorithm~\ref{alg:maspg_car} reduces to Algorithm~\ref{alg:pg} when $\beta_k=0$
 \subsection{Optimization Landscape and Multi-Component Extensions}
 The single-component problem analyzed here is nonconvex (because variance maximization is written as minimization of a negative quadratic), but it has a favorable composite structure: a smooth quadratic plus a convex nonsmooth term. This makes proximal-gradient methods natural and scalable.
 
-In contrast, multi-component formulations with $V^\top V=I_k$ add a nonconvex manifold constraint. A straightforward ``threshold then orthogonalize'' pipeline is generally unstable with respect to sparsity because the orthogonalization step mixes coordinates and can re-densify loadings. Manifold proximal-gradient (ManPG-type) methods address this by solving a proximal subproblem in the tangent space of the Stiefel manifold and then retracting back to the manifold \cite{chen2020manpg,chen2020amanpg}. The graph Laplacian term contributes a smooth gradient term of the form $2\lambda_2 L V$, so it integrates naturally into the smooth part of such methods.
+In contrast, multi-component formulations with $V^\top V=I_k$ add a nonconvex manifold constraint. A straightforward ``threshold then orthogonalize'' pipeline is unstable for sparsity because orthogonalization mixes coordinates and can re-densify loadings.
+
+Manifold proximal-gradient (ManPG-type) methods address this by solving a proximal subproblem in the tangent space of the Stiefel manifold and then retracting back to the manifold \cite{chen2020manpg,chen2020amanpg}. The graph Laplacian term contributes the smooth gradient term $2\lambda_2 L V$, so it fits naturally into the smooth part of such methods.
 
 \paragraph{Canonical tangent-space subproblem (informal).}
 At an iterate $V_t$ on the Stiefel manifold, ManPG-type methods solve a convex proximal subproblem over the tangent space
@@ -408,7 +422,7 @@ For manifold variants and alternating schemes, convergence claims typically requ
 % 7. Experiments
 % =========================
 \section{Experimental Design}
-We evaluate whether incorporating network structure improves \emph{structured feature selection} and \emph{support recovery} relative to unstructured alternatives while preserving explained variance.
+We evaluate whether incorporating network structure improves \emph{structured feature selection} and \emph{support recovery} relative to unstructured alternatives while preserving explained variance. The working hypothesis is conditional: graph regularization should help when the graph is informative and can fail when the graph is misspecified.
 
 \subsection{Synthetic Data and Graph Families}
 We generate feature graphs $G$ from several families:
@@ -416,7 +430,7 @@ We generate feature graphs $G$ from several families:
 (ii) grids (spatial structure),
 (iii) random geometric graphs (local neighborhoods),
 (iv) stochastic block models (community structure).
-We construct ground-truth sparse loadings with connected support sets (when appropriate) and sample data from a spiked covariance model whose leading component aligns with the ground truth. This design isolates the effect of graph regularization on recovery while keeping the data-generating process controlled.
+We construct ground-truth sparse loadings with connected support sets (when appropriate) and sample data from a spiked covariance model whose leading component aligns with the ground truth. This design isolates the effect of graph regularization on recovery while keeping the data-generating process controlled. It also makes failure modes easier to interpret because both the true support and the estimator graph are known.
 
 \subsection{Data-Generating Process (Recommended Default)}
 For a graph $G$ on $p$ nodes, let $S^\star\subseteq\{1,\dots,p\}$ denote a connected support set of size $s$. We define a ground-truth loading $w^\star\in\R^p$ with $\supp(w^\star)=S^\star$ and $\|w^\star\|_2=1$ (e.g., piecewise-smooth values over $S^\star$). A simple spiked covariance model is
@@ -429,7 +443,7 @@ with signal strength $\beta>0$ and noise level $\sigma^2>0$. Data are generated 
 To study robustness, we recommend perturbing the feature graph used by the estimator (while keeping $\Sigma^\star$ fixed), e.g., by edge deletion, edge rewiring, or weight noise. This directly probes sensitivity to graph misspecification.
 
 \subsection{Protocol and Hyperparameter Selection}
-For each graph family and signal-to-noise setting, we generate multiple random instances and report means with variability summaries (e.g., standard errors or interquartile ranges). Hyperparameters $(\lambda_1,\lambda_2)$ are selected by a validation criterion that balances explained variance and support quality, or by grid search against an oracle support metric in controlled simulations. We recommend reporting sensitivity curves to visualize the sparsity--smoothness trade-off frontier.
+For each graph family and signal-to-noise setting, we generate multiple random instances and report means with variability summaries (e.g., standard errors or interquartile ranges). Hyperparameters $(\lambda_1,\lambda_2)$ are selected by a validation criterion that balances explained variance and support quality, or by grid search against an oracle support metric in controlled simulations. We recommend reporting sensitivity curves to visualize the sparsity and smoothness trade-off frontier.
 
 \paragraph{Reproducible protocol details.}
 To make results reproducible and comparable, we recommend fixing the following:
@@ -445,9 +459,10 @@ To make results reproducible and comparable, we recommend fixing the following:
 \paragraph{Example parameter grid and stopping rule.}
 A practical default is to use logarithmic grids after feature standardization, e.g.,
 \begin{equation}
-\lambda_1\in\{10^{-4},10^{-3.5},\dots,10^{-1}\},
-\qquad
-\lambda_2\in\{10^{-4},10^{-3.5},\dots,10^{0}\},
+\begin{aligned}
+\lambda_1 &\in \{10^{-4},10^{-3.5},\dots,10^{-1}\}, \\
+\lambda_2 &\in \{10^{-4},10^{-3.5},\dots,10^{0}\},
+\end{aligned}
 \end{equation}
 with warm starts along each regularization path. Terminate when
 \begin{equation}
@@ -490,46 +505,60 @@ All ablation variants should share the same stopping criteria, initialization po
 We report:
 \begin{itemize}[leftmargin=*]
 \item explained variance $w^\top \Sigmahat w$,
-\item support recovery (precision/recall/F1 against the ground-truth support),
-\item structural coherence (largest connected component ratio within the selected support and the Laplacian energy $w^\top L w$),
+\item support recovery (precision/recall/F1 against the true support),
+\item structural coherence (largest connected-component ratio and Laplacian energy $w^\top L w$ within the selected support),
 \item runtime and iteration counts.
 \end{itemize}
 
-\subsection{Results (Templates)}
+\subsection{Results}
 \begin{table}[t]
 \centering
-\caption{Main performance comparison on synthetic benchmarks (template).}
+\caption{Aggregate synthetic benchmark results from the current audit run. Values are means across chain, grid, random geometric graph, and SBM families.}
 \label{tab:main_performance}
-\begin{tabular}{lcccc}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{@{}l>{\centering\arraybackslash}X>{\centering\arraybackslash}X>{\centering\arraybackslash}X>{\centering\arraybackslash}X@{}}
 \toprule
-Method & Var. Explained $\uparrow$ & F1 $\uparrow$ & LCC Ratio $\uparrow$ & Time (s) $\downarrow$ \\
+Method & Var.\ Explained $\uparrow$ & F1 $\uparrow$ & LCC Ratio $\uparrow$ & Time (s) $\downarrow$ \\
 \midrule
-PCA & -- & -- & -- & -- \\
-$\ell_1$-SPCA & -- & -- & -- & -- \\
-Graph-PCA & -- & -- & -- & -- \\
-Ours (Graph+$\ell_1$) & -- & -- & -- & -- \\
+PCA & 9.899 & 0.337 & 1.000 & 0.0027 \\
+$\ell_1$-SPCA & 9.857 & 0.403 & 0.998 & 0.0074 \\
+Graph-PCA & 9.830 & 0.336 & 1.000 & 0.0092 \\
+NetSPCA-PG & 9.799 & 0.397 & 0.995 & 0.0094 \\
+NetSPCA-MASPG-CAR & 9.797 & 0.397 & 0.995 & 0.0090 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
+\normalsize
 \end{table}
 
 \begin{table}[t]
 \centering
-\caption{Ablation / sensitivity summary across $(\lambda_1,\lambda_2)$ settings (template).}
-\label{tab:ablation}
-\begin{tabular}{lccc}
+\caption{Aggregate synthetic benchmark results under graph misspecification (edge perturbation rate $0.1$).}
+\label{tab:misspec_performance}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{@{}l>{\centering\arraybackslash}X>{\centering\arraybackslash}X>{\centering\arraybackslash}X>{\centering\arraybackslash}X@{}}
 \toprule
-Setting & Sparsity ($\|w\|_0$) $\downarrow$ & Laplacian Energy $w^\top L w$ $\downarrow$ & F1 $\uparrow$ \\
+Method & Var.\ Explained $\uparrow$ & F1 $\uparrow$ & LCC Ratio $\uparrow$ & Time (s) $\downarrow$ \\
 \midrule
-Low $\lambda_1$, low $\lambda_2$ & -- & -- & -- \\
-High $\lambda_1$, low $\lambda_2$ & -- & -- & -- \\
-Low $\lambda_1$, high $\lambda_2$ & -- & -- & -- \\
-High $\lambda_1$, high $\lambda_2$ & -- & -- & -- \\
+PCA & 9.410 & 0.338 & 1.000 & 0.0028 \\
+$\ell_1$-SPCA & 9.367 & 0.419 & 1.000 & 0.0076 \\
+Graph-PCA & 9.234 & 0.335 & 1.000 & 0.0096 \\
+NetSPCA-PG & 9.222 & 0.403 & 1.000 & 0.0094 \\
+NetSPCA-MASPG-CAR & 9.221 & 0.403 & 1.000 & 0.0087 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
+\normalsize
 \end{table}
+
+\paragraph{Current evidence from the repository.}
+In the base synthetic benchmark, $\ell_1$-SPCA achieves the highest mean support F1 among the core methods currently reported. The network-constrained variants remain close in F1 but do not exceed the unstructured sparse baseline in the current aggregate audit. Under graph misspecification, the gap in favor of unstructured $\ell_1$-SPCA widens further. For optimization, MASPG-CAR reduces average iterations relative to baseline PG, and continuation provides the clearest measured runtime gain over naive grid traversal.
+
+\paragraph{Optimization ablation summary.}
+The current ablation artifacts show that MASPG-CAR reduces the mean iteration count from $9.5$ to $6.0$ relative to baseline PG, with runtime changing from $0.0094$ s to $0.0090$ s in the audited setting. Continuation or warm-start traversal reduces total path iterations from $136$ to $91$, corresponding to a measured $1.43\times$ speedup over naive grid traversal.
 
 \paragraph{Expected qualitative trends.}
-When the graph prior is informative, increasing $\lambda_2$ should reduce Laplacian energy and improve support coherence (e.g., larger connected-component ratios) at a fixed sparsity level. Excessive graph regularization may over-smooth the loadings and reduce support precision or explained variance. The useful operating regime is therefore a Pareto region rather than a single universally optimal parameter pair.
+When the graph prior is informative, increasing $\lambda_2$ should reduce Laplacian energy and improve support coherence (e.g., larger connected-component ratios) at a fixed sparsity level. Excessive graph regularization may over-smooth the loadings and reduce support precision or explained variance. Under graph misspecification, unstructured $\ell_1$-SPCA can match or exceed network-constrained variants on support F1, so the useful operating regime is a Pareto region rather than a single universally optimal parameter pair.
 
 % =========================
 % 8. Discussion
@@ -545,15 +574,15 @@ Our formal algorithmic and convergence results target a single component under a
 Optimization convergence alone does not imply statistical consistency or valid uncertainty quantification. In high-dimensional settings, inferential guarantees depend on signal strength, graph quality, regularization scaling, and model mismatch. A complete inference theory for graph-regularized SPCA (e.g., support recovery guarantees and perturbation bounds under graph misspecification) remains an important research direction.
 
 \paragraph{Applications and implications.}
-The framework is well motivated in genomics, finance, and sensor networks, where domain knowledge naturally induces feature graphs. In such settings, network-constrained SPCA can be viewed as a structured feature-selection mechanism that trades off variance explanation against geometric coherence. The practical value of the method depends on whether the graph captures stable domain structure rather than transient correlations.
+The framework is well motivated in genomics, finance, and sensor networks, where domain knowledge naturally induces feature graphs. In such settings, network-constrained SPCA can be viewed as a structured feature selection mechanism that trades off variance explanation against geometric coherence. Its practical value depends on whether the graph captures stable domain structure rather than transient correlations. Current synthetic audits in this repository support the caution that graph based methods are not uniformly dominant under misspecification.
 
 % =========================
 % 9. Conclusion
 % =========================
 \section{Conclusion}
-We studied a network-constrained SPCA objective that jointly promotes variance explanation, sparsity, and graph smoothness through a graph Laplacian regularizer. For the single-component, $\ell_2$-ball-constrained formulation, the resulting method is an exact proximal-gradient algorithm with a closed-form composite proximal map and a standard convergence guarantee to critical points. We also clarified why multi-component sparse orthogonal formulations require manifold-aware proximal methods rather than naive thresholding-plus-orthogonalization pipelines.
+We studied a network-constrained SPCA objective that jointly promotes variance explanation, sparsity, and graph smoothness through a graph Laplacian regularizer. For the single-component, $\ell_2$ ball constrained formulation, the resulting method is an exact proximal-gradient algorithm with a closed-form composite proximal map and a standard convergence guarantee to critical points. We also clarified why multi-component sparse orthogonal formulations require manifold-aware proximal methods rather than naive thresholding followed by orthogonalization.
 
-The main practical implication is that structural priors can be integrated into sparse dimensionality reduction without sacrificing first-order scalability. The main scientific caveat is that gains depend critically on graph quality. Future work should develop statistical recovery guarantees under graph misspecification, robust graph-learning variants, and fully analyzed manifold proximal methods for multi-component network-constrained SPCA.
+The main practical implication is that structural priors can be integrated into sparse dimensionality reduction without sacrificing first-order scalability. The main scientific caveat is that gains depend critically on graph quality and are not uniform across regimes. Future work should develop statistical recovery guarantees under graph misspecification, robust graph learning variants, and fully analyzed manifold proximal methods for multi-component network-constrained SPCA.
 
 % =========================
 % Appendix
@@ -616,7 +645,10 @@ Combining the two cases yields the formula in Proposition~\ref{prop:prox-composi
 \paragraph{Notation.}
 Let $d^k:=w^{k+1}-w^k$. Since Algorithm~\ref{alg:pg} is the exact proximal-gradient update for $F=f+h$, we have
 \begin{equation}
-w^{k+1}\in \arg\min_{w}\left\{ h(w)+\langle \nabla f(w^k), w-w^k\rangle + \frac{1}{2\eta}\|w-w^k\|_2^2 \right\}.
+\begin{aligned}
+w^{k+1}\in \arg\min_{w}\Bigl\{ & h(w)+\langle \nabla f(w^k), w-w^k\rangle \\
+& + \frac{1}{2\eta}\|w-w^k\|_2^2 \Bigr\}.
+\end{aligned}
 \end{equation}
 
 \begin{lemma}[Sufficient decrease]
@@ -664,8 +696,11 @@ r^{k+1}:=\nabla f(w^{k+1})+\xi^{k+1}.
 \end{equation}
 Then
 \begin{equation}
-\|r^{k+1}\|_2 \le \|\nabla f(w^{k+1})-\nabla f(w^k)\|_2 + \frac{1}{\eta}\|d^k\|_2
-\le \left(L_f+\frac{1}{\eta}\right)\|d^k\|_2 \to 0.
+\begin{aligned}
+\|r^{k+1}\|_2
+&\le \|\nabla f(w^{k+1})-\nabla f(w^k)\|_2 + \frac{1}{\eta}\|d^k\|_2 \\
+&\le \left(L_f+\frac{1}{\eta}\right)\|d^k\|_2 \to 0.
+\end{aligned}
 \end{equation}
 Let $\{w^{k_j}\}$ be a convergent subsequence with limit $\bar w$. Since $\|d^{k_j}\|_2\to 0$, we also have $w^{k_j+1}\to \bar w$. Using closedness of the graph of the convex subdifferential $\partial h$ and $r^{k_j+1}\to 0$, we obtain
 \begin{equation}
@@ -681,7 +716,8 @@ Table~\ref{tab:synthetic_config} provides a concrete default configuration for r
 \centering
 \caption{Concrete default synthetic benchmark configuration (example).}
 \label{tab:synthetic_config}
-\begin{tabular}{ll}
+\scriptsize
+\begin{tabularx}{\columnwidth}{@{}lY@{}}
 \toprule
 Item & Default configuration \\
 \midrule
@@ -698,7 +734,8 @@ Graph misspecification & edge deletion rates $\{0,0.1,0.2\}$; rewiring rates $\{
 Feature standardization & center columns, unit empirical variance \\
 Support extraction rule & threshold at $10^{-8}$, deterministic tie-break by index \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
+\normalsize
 \end{table}
 
 \subsection{Optimization and Hyperparameter Search Settings}
@@ -713,7 +750,7 @@ We recommend the following defaults unless a dataset-specific tuning policy is r
 \item implementation report: CPU model, BLAS/LAPACK backend, thread count, and software versions.
 \end{itemize}
 
-\subsection{Evaluation and Reproducibility Checklist}
+\subsection{\texorpdfstring{Evaluation and\\ Reproducibility Checklist}{Evaluation and Reproducibility Checklist}}
 For complete reproducibility, report:
 \begin{itemize}[leftmargin=*]
 \item random seed schedule (graph seed, support seed, sampling seed) per replicate;
@@ -724,24 +761,33 @@ For complete reproducibility, report:
 \item runtime measurement protocol (wall-clock vs CPU time, inclusion/exclusion of data generation).
 \end{itemize}
 
-\subsection{Code-Level Reproduction Commands}
+\subsection{\texorpdfstring{Code-Level\\ Reproduction Commands}{Code-Level Reproduction Commands}}
 The reference implementation includes config-driven scripts that produce tables and figures directly:
 \begin{itemize}[leftmargin=*]
 \item synthetic baseline comparison:
-\texttt{uv run python scripts/run\_experiment.py --dataset synthetic --n-repeats 3};
+\begin{quote}\raggedright\ttfamily\small
+uv run python scripts/run\_experiment.py --dataset synthetic --n-repeats 3
+\end{quote}
 \item hyperparameter sweeps:
-\texttt{uv run python scripts/run\_sweep.py --n-repeats 2};
+\begin{quote}\raggedright\ttfamily\small
+uv run python scripts/run\_sweep.py --n-repeats 2
+\end{quote}
 \item real-data comparisons:
-\texttt{uv run python scripts/run\_experiment.py --dataset colon} and
-\texttt{uv run python scripts/run\_experiment.py --dataset pitprop};
+\begin{quote}\raggedright\ttfamily\small
+uv run python scripts/run\_experiment.py --dataset colon\\
+uv run python scripts/run\_experiment.py --dataset pitprop
+\end{quote}
 \item one-command bundle:
-\texttt{uv run python scripts/reproduce\_figures.py}.
+\begin{quote}\raggedright\ttfamily\small
+uv run python scripts/reproduce\_figures.py
+\end{quote}
 \end{itemize}
-These commands write timestamped artifacts (CSV/JSON/LaTeX/PNG) to the \texttt{results/} directory.
+Outputs are written to the \mbox{\texttt{results/}} directory.
 
 % =========================
 % References
 % =========================
+\fussy
 \bibliographystyle{plain}
 \bibliography{references}
 

@@ -128,6 +128,12 @@ This project uses `uv` for modern, fast Python package management.
 *   `scripts/`: Reproducible experiment/sweep runners.
 *   `doc/`: Theoretical documentation, derivations, and publication drafts.
 
+## Paper Review Workflow
+
+For manuscript audit, citation cleanup, related-work review, and paper-to-code consistency checks, see:
+
+- `SCIENTIFIC_REVIEW_WORKFLOW.md`
+
 ---
 
 ## ✅ CI
