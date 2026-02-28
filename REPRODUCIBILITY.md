@@ -6,179 +6,123 @@
 uv sync --dev
 ```
 
-## Deterministic runs
-
-- Every run accepts `--seed`.
-- Repeated trials use `seed + repeat_index`.
-- Config is stored alongside results in `config.json`.
-
-## Main paper-style comparison
+Optional remote or alternate backends:
 
 ```bash
-uv run python scripts/run_experiment.py \
-  --n-repeats 3 \
-  --lambda1 0.15 \
-  --lambda2 0.25 \
-  --max-iter 400 \
-  --seed 42
+pip install torch geoopt wandb
 ```
 
-Artifacts are written to `results/synth-comparison-<timestamp>/`:
+## New architecture runs
 
-- `config.json`
-- `records.json` / `records.csv`
-- `summary.csv`
-- `summary_table.tex`
-- `significance.csv` / `significance.json` (paired tests vs `NetSPCA-PG`, when pairings are available)
+The new package uses Hydra config composition and writes all outputs under `outputs/`.
 
-Recorded metrics include:
-
-- explained variance
-- support precision/recall/F1
-- top-k precision/recall/F1 (`k = |S*|`)
-- LCC ratio
-- Laplacian energy
-- runtime / convergence
-
-Compared methods include `NetSPCA-ProxQN` in addition to `NetSPCA-PG` and `NetSPCA-MASPG-CAR`.
-
-## Graph misspecification robustness
+Run the default synthetic experiment:
 
 ```bash
-uv run python scripts/run_experiment.py \
-  --dataset synthetic \
-  --graph-misspec-rate 0.15 \
-  --n-repeats 3 \
-  --seed 42
+uv run nc-spca-run
 ```
 
-This perturbs the estimator graph (not the data-generating covariance) and logs `graph_misspec_rate` in outputs.
-
-## Multi-component manifold benchmark
+Run a specific optimizer and regularization setting:
 
 ```bash
-uv run python scripts/run_experiment.py \
-  --dataset synthetic \
-  --n-components 3 \
-  --include-stiefel-manifold \
-  --n-repeats 3 \
-  --seed 42
+uv run nc-spca-run optimizer=pg objective.lambda1=0.1 objective.lambda2=0.25 experiment.seed=7
 ```
 
-## Real dataset runs
+Run a multirun sweep:
 
 ```bash
-uv run python scripts/run_experiment.py --dataset colon --seed 42
-uv run python scripts/run_experiment.py --dataset pitprop --seed 42
+uv run nc-spca-sweep -m optimizer=pg,prox_qn objective.lambda1=0.05,0.1 objective.lambda2=0.1,0.2
 ```
 
-Artifacts are written to:
-
-- `results/colon-comparison-<timestamp>/`
-- `results/pitprop-comparison-<timestamp>/`
-
-Each folder contains `config.json`, `records.json/csv`, and `summary.csv`.
-
-## Hyperparameter sweeps
+Run aligned method comparisons:
 
 ```bash
-uv run python scripts/run_sweep.py \
-  --lambda1-grid 0.01,0.05,0.1,0.2,0.5 \
-  --lambda2-grid 0.0,0.01,0.05,0.1,0.5,1.0 \
-  --n-repeats 2 \
-  --seed 42
+uv run nc-spca-sweep -m method=pca,l1_spca,graph_pca,nc_spca_pg,nc_spca_maspg_car,nc_spca_prox_qn data=pitprop experiment=real_pitprop
 ```
 
-Artifacts are written to `results/synth-sweep-<timestamp>/`:
-
-- `records.csv`
-- `netspca_records.csv`
-- `netspca_summary.csv`
-- `netspca_summary.tex`
-- `variance_vs_sparsity.png`
-- `connectivity_vs_lambda2.png`
-
-Optional robustness sweep:
+Run the paper-core config explicitly:
 
 ```bash
-uv run python scripts/run_sweep.py --graph-misspec-rate 0.1 --n-repeats 2 --seed 42
+uv run nc-spca-reproduce experiment=paper_core
 ```
 
-## One-command bundle
+Inspect a finished run:
 
 ```bash
-uv run python scripts/reproduce_figures.py
+uv run nc-spca-visualize outputs/nc_spca/paper_core/<run_id>
 ```
 
-This executes synthetic comparison, synthetic sweep, and colon comparison in sequence.
+## New output layout
 
-## Convexity and objective visualizations
+Each run directory contains:
 
-```bash
-uv run python scripts/convexity_and_objectives.py
-```
+- `resolved_config.json`
+- `env.json`
+- `git_commit.txt` when available
+- `metrics.jsonl`
+- `events.jsonl`
+- `seed_manifest.json`
+- `summary.json`
+- `checkpoints/latest/`
+- `checkpoints/best/`
+- `artifacts/records.json`
+- `artifacts/records.csv`
 
-Outputs are written to `figures/convexity_and_objectives/` by default.
+Determinism policy:
 
-## Backend comparison (implementation backend parity)
+- experiment repeat `r` uses `seed + r`
+- the seed manifest is written per run
+- the resolved config is persisted once at run start
 
-```bash
-uv run python scripts/run_backend_comparison.py --n-repeats 3 --seed 42
-```
+## Legacy benchmark stack
 
-Artifacts are written to `results/backend-comparison-<timestamp>/`:
-
-- `config.json`
-- `records.csv`
-- `summary.csv`
-- `significance.csv` / `significance.json` (backend vs NumPy paired tests)
-
-## Dynamic graph robustness
-
-```bash
-uv run python scripts/run_dynamic_graph_experiment.py --n-steps 5 --seed 42
-```
-
-Artifacts are written to `results/dynamic-graph-<timestamp>/`:
-
-- `config.json`
-- `records.csv`
-- `summary.csv`
-
-## Pinned paper artifact manifests
+The repository still ships the older experiment scripts during migration:
 
 ```bash
+uv run python scripts/run_experiment.py --n-repeats 3
+uv run python scripts/run_sweep.py --n-repeats 2
 uv run python scripts/reproduce_paper_artifacts.py
 ```
 
-This executes the default manifest set in `benchmarks/manifests/`:
+Those commands still write to `results/`. New architecture runs should use `outputs/`.
 
-- `paper_core.json`
-- `paper_misspec.json`
-- `paper_large_scale.json`
+## Supported new-method presets
 
-## Large-scale stress (`p >= 2000`)
+The `conf/method/` group currently includes:
+
+- `pca`
+- `l1_spca`
+- `gpower`
+- `elastic_net_spca`
+- `graph_pca`
+- `nc_spca_pg`
+- `nc_spca_maspg_car`
+- `nc_spca_prox_qn`
+- `nc_spca_block`
+
+Real-data presets:
 
 ```bash
-uv run python scripts/run_large_scale_stress.py \
-  --n-features-grid 2000,3000 \
-  --n-repeats 1 \
-  --max-iter 200 \
-  --seed 42
+uv run nc-spca-run method=nc_spca_pg data=colon experiment=real_colon
+uv run nc-spca-run method=pca data=pitprop experiment=real_pitprop
 ```
 
-Outputs include stationarity diagnostics in `summary.csv`:
-
-- `pg_residual_last_mean`
-- `pg_residual_ratio_mean`
-- `objective_monotone_rate`
-- `qn_accept_rate_mean` / `qn_fallback_rate_mean` (for ProxQN runs)
-
-## Validation checks
+Block-model preset:
 
 ```bash
-uv run ty check src/experiments src/models src/utils scripts tests
+uv run nc-spca-run method=nc_spca_block data=synthetic_grid data.n_samples=36 data.n_features=16 data.support_size=4 experiment.repeats=1
+```
+
+Manuscript support-pattern figure:
+
+```bash
+.venv/bin/python scripts/plot_block_support_patterns.py --output doc/latex/figures/block_support_patterns.png
+```
+
+## Validation
+
+```bash
+uv run ty check src/nc_spca tests/test_architecture_core.py tests/test_experiment_runner.py tests/test_cli_run.py tests/test_checkpointing.py tests/test_config_loader.py
+uv run ruff check src/nc_spca tests/test_architecture_core.py tests/test_experiment_runner.py tests/test_cli_run.py tests/test_checkpointing.py tests/test_config_loader.py
 uv run pytest -q
-uv run ruff check src/experiments src/models src/utils scripts tests
-uv run black --check src/experiments src/models src/utils scripts tests
 ```

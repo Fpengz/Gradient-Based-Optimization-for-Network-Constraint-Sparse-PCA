@@ -1,0 +1,5 @@
+# @package _global_
+defaults:
+  - override /model: elastic_net_spca
+  - override /objective: elastic_net_spca
+  - override /optimizer: pg

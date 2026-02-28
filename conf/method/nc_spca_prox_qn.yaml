@@ -1,0 +1,5 @@
+# @package _global_
+defaults:
+  - override /model: nc_spca_single
+  - override /objective: nc_spca_single
+  - override /optimizer: prox_qn

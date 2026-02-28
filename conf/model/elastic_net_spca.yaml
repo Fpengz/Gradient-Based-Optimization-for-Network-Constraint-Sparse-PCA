@@ -1,0 +1,4 @@
+name: elastic_net_spca
+n_components: 1
+init: pca
+random_state: 42

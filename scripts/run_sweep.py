@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+import _bootstrap  # noqa: F401
 from src.experiments.synthetic_benchmark import (
     _perturb_graph_for_misspecification,
     SyntheticBenchmarkConfig,

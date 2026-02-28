@@ -8,6 +8,7 @@
 \usepackage{mathtools}
 \usepackage{microtype}
 \usepackage{graphicx}
+\usepackage{subcaption}
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{array}
@@ -36,10 +37,12 @@
 \DeclareMathOperator{\soft}{soft}
 \DeclareMathOperator{\supp}{supp}
 \DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\sym}{sym}
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 \setlength{\columnsep}{0.25in}
 \setlength{\emergencystretch}{3em}
 \hbadness=10000
+\graphicspath{{figures/}}
 
 % =========================
 % Title
@@ -57,7 +60,7 @@
 % Abstract
 % =========================
 \begin{abstract}
-Sparse principal component analysis (SPCA) improves interpretability by inducing sparse loadings, but standard formulations often treat features as exchangeable and ignore known relational structure. In many applications, including genomics, sensor networks, and finance, features are coupled by an underlying graph. We study a network-constrained SPCA formulation that combines variance maximization with an $\ell_1$ sparsity penalty and a graph Laplacian smoothness regularizer. For the single-component problem with a unit $\ell_2$ ball constraint, we derive an exact proximal-gradient method for a nonconvex smooth term plus a convex nonsmooth term, including the ball indicator. The resulting proximal map has the closed form soft-thresholding followed by radial projection. Under Lipschitz continuity of the smooth gradient, the method converges to critical points in the standard nonconvex composite sense. We also explain why multi-component extensions require manifold-aware proximal methods. Empirically, the method should be viewed as conditionally useful: structural gains depend on graph quality and can deteriorate under misspecification.
+Sparse principal component analysis (SPCA) improves interpretability by inducing sparse loadings, but standard formulations often treat features as exchangeable and ignore known relational structure. In many applications, including genomics, sensor networks, and finance, features are coupled by an underlying graph. We study a network-constrained SPCA formulation that combines variance maximization with an $\ell_1$ sparsity penalty and a graph Laplacian smoothness regularizer under a unit $\ell_2$ ball constraint. For this single-component problem, we identify the exact proximal map of $\lambda_1\|w\|_1 + I_{\mathbb{B}_2}(w)$ as soft-thresholding followed by radial projection, which yields a simple proximal-gradient baseline. The associated convergence statement is the standard critical-point guarantee for nonconvex composite proximal gradient under Lipschitz gradient assumptions. We also implement a multi-component block extension on the Stiefel manifold using a manifold proximal-gradient scheme with either entrywise $\ell_1$ or row-wise $\ell_{2,1}$ sparsity. The reported results remain conditional rather than uniformly dominant: in the aggregate single-component regime, $\ell_1$-SPCA attains the best mean support F1, while in a two-component synthetic study the row-sparse block method is markedly more stable than entrywise $\ell_1$ in shared-support settings and preserves orthogonality to machine precision.
 \end{abstract}
 
 % =========================
@@ -68,16 +71,18 @@ Modern scientific and industrial datasets are routinely high-dimensional, with f
 
 Sparse principal component analysis (SPCA) addresses this limitation by promoting sparse loadings, typically via $\ell_1$-type penalties or related sparsity-inducing regularizers. Sparsity improves interpretability by selecting a subset of variables and can reduce acquisition or monitoring costs. However, standard SPCA often treats features as exchangeable and ignores known relational structure. In many domains, this is a poor inductive bias: genes interact through pathways and regulatory networks, financial assets are coupled by sectors and supply chains, and sensors lie on physical geometries with local signal propagation. Purely sparse solutions may therefore produce fragmented supports that are statistically plausible but structurally implausible.
 
-This paper studies \emph{network-constrained sparse PCA}, which augments SPCA with a graph Laplacian regularizer to encourage loadings that are simultaneously sparse and smooth over a feature graph. The Laplacian term penalizes local variation across graph edges and therefore favors coherent selections when the graph is informative. Our focus is twofold: (i) a single-component formulation with a unit $\ell_2$ ball constraint and an exact proximal-gradient algorithm, and (ii) a scoped discussion of how the optimization landscape changes in multi-component extensions with orthogonality constraints.
+This paper studies \emph{network-constrained sparse PCA}, which augments SPCA with a graph Laplacian regularizer to encourage loadings that are simultaneously sparse and smooth over a feature graph. The Laplacian term penalizes local variation across graph edges and therefore favors coherent selections when the graph is informative. Our theorem-backed focus is intentionally narrow: a single-component formulation with a unit $\ell_2$ ball constraint, an exact composite proximal step, and a baseline proximal-gradient algorithm with a standard convergence guarantee. We also develop a practical multi-component extension on the Stiefel manifold and evaluate it empirically, but we do not claim a new manifold convergence theorem in this paper.
 
 \paragraph{Contributions.}
 Our main contributions are as follows:
 \begin{itemize}[leftmargin=*]
   \item We formulate a graph-regularized SPCA objective that combines variance maximization, $\ell_1$ sparsity, and Laplacian smoothness under an $\ell_2$-ball constraint.
-  \item We derive a simple and scalable proximal gradient algorithm and show that the update ``soft-thresholding + radial projection'' is the \emph{exact} proximal operator of $\lambda_1\|w\|_1 + I_{\mathbb{B}_2}(w)$.
-  \item We provide a standard convergence guarantee to critical points for the resulting nonconvex composite problem using the exact composite proximal map.
-  \item We empirically evaluate structured feature selection on synthetic graph families and identify the regimes in which graph regularization helps or hurts support recovery.
+  \item We show that the update ``soft-thresholding + radial projection'' is the \emph{exact} proximal operator of $\lambda_1\|w\|_1 + I_{\mathbb{B}_2}(w)$, which yields a simple proximal-gradient baseline for the stated single-component objective.
+  \item We instantiate the standard nonconvex composite proximal-gradient convergence argument for this objective and obtain convergence of the baseline method to critical points under Lipschitz gradient assumptions.
+  \item We implement a multi-component block extension on the Stiefel manifold with either entrywise $\ell_1$ sparsity or row-wise $\ell_{2,1}$ sparsity, using a native manifold proximal-gradient solver with retraction-based orthogonality handling.
+  \item We empirically evaluate synthetic graph families and graph-misspecification regimes, with emphasis on when graph regularization helps, when it does not, and how a practical accelerated variant changes optimization cost without changing the theorem-backed scope.
 \end{itemize}
+The paper does not claim a new general optimization framework, and the formal convergence theorem is restricted to the single-component baseline.
 
 % =========================
 % 2. Related Work
@@ -93,7 +98,7 @@ Motivated by scalability, recent work has emphasized first-order algorithms and 
 Graph-regularized dimensionality reduction introduces Laplacian penalties to preserve geometric and relational structure. In biological and other networked settings, incorporating feature graphs has been shown to improve interpretability and scientific validity by selecting coherent modules rather than isolated variables \cite{miao2022genomeNetworkSPCA}. Our formulation is aligned with this perspective and focuses on a direct proximal-gradient treatment of a Laplacian-regularized SPCA objective under a simple norm constraint. Relative to application-specific graph PCA variants, the emphasis here is on an exact composite proximal map for the single-component objective and a careful separation between theorem-backed and practical solver variants.
 
 \paragraph{Manifold-constrained sparse components.}
-For multi-component sparse PCA, orthogonality constraints introduce Stiefel manifold geometry. In that setting, naive thresholding followed by orthogonal projection can destroy sparsity patterns, motivating manifold proximal-gradient methods that combine tangent-space proximal subproblems with retraction steps \cite{chen2020manpg,chen2020amanpg,chen2024manpgsurvey}. We do not re-derive those algorithms here, but we use them as the conceptual extension of our single-component analysis.
+For multi-component sparse PCA, orthogonality constraints introduce Stiefel manifold geometry. In that setting, naive thresholding followed by orthogonal projection can destroy sparsity patterns, motivating manifold proximal-gradient methods that combine tangent-space proximal subproblems with retraction steps \cite{chen2020manpg,chen2020amanpg,chen2024manpgsurvey}. We use that literature to motivate a practical block manifold proximal-gradient extension with either entrywise or row-wise sparsity, while keeping our formal theorem statements restricted to the single-component Euclidean problem.
 
 \subsection{Algorithmic Positioning and Comparison}
 Table~\ref{tab:algorithm_comparison} summarizes how the proposed algorithm differs from representative SPCA solvers in objective structure, constraint geometry, and update design.
@@ -198,27 +203,43 @@ with
 \end{align}
 where $\mathbb{B}_2=\{w:\|w\|_2\le 1\}$ and $I_{\mathbb{B}_2}$ is the indicator of the unit $\ell_2$ ball. The function $f$ is smooth (quadratic), while $h$ is proper, closed, and convex but nonsmooth.
 
-\subsection{Multi-Component Stiefel Extension (Formalization)}
-For $k>1$, a common extension is to optimize a loading matrix $V\in\R^{p\times k}$ with orthonormal columns:
+\subsection{Multi-Component Stiefel Extension}
+For $k>1$, we replace the vector loading $w$ by a loading matrix $V\in\R^{p\times k}$ and impose the orthogonality constraint
 \begin{equation}
-\label{eq:multi_component_obj}
-\max_{V^\top V=I_k}\;
+V^\top V = I_k.
+\end{equation}
+The corresponding block objective is
+\begin{equation}
+\label{eq:block_obj}
+\max_{V^\top V = I_k}\;
 \tr(V^\top \Sigmahat V)
-- \lambda_1 \,\Omega(V)
-- \lambda_2 \tr(V^\top L V),
+\;-\;
+\lambda_1 \Omega(V)
+\;-\;
+\lambda_2 \tr(V^\top L V),
 \end{equation}
-where $\Omega(V)$ is a sparsity-inducing penalty. Two common choices are the entrywise $\ell_1$ penalty,
-\begin{equation}
-\Omega(V)=\|V\|_1=\sum_{i=1}^p\sum_{j=1}^k |V_{ij}|,
-\end{equation}
-and the row-sparsity inducing $\ell_{2,1}$ penalty,
-\begin{equation}
-\Omega(V)=\|V\|_{2,1}=\sum_{i=1}^p \|V_{i\cdot}\|_2,
-\end{equation}
-which encourages shared feature selection across components. The constraint set $\{V:V^\top V=I_k\}$ is the Stiefel manifold, which changes both the optimization geometry and the stationarity conditions.
+where $\Omega(V)=\|V\|_1$ gives entrywise sparsity and $\Omega(V)=\|V\|_{2,1}$ gives row sparsity shared across components.
 
-\paragraph{Scope of this paper.}
-Equation~\eqref{eq:multi_component_obj} motivates the manifold-proximal discussion below, but our formal algorithm and theorem are intentionally stated only for the single-component problem \eqref{eq:main_obj}, where the exact composite proximal step can be written in closed form.
+Equivalently, we minimize
+\begin{equation}
+\min_{V^\top V = I_k}\; F_{\mathrm{blk}}(V)=f_{\mathrm{blk}}(V)+h_{\mathrm{blk}}(V),
+\end{equation}
+with
+\begin{align}
+f_{\mathrm{blk}}(V) &= -\tr(V^\top \Sigmahat V) + \lambda_2 \tr(V^\top L V), \\
+h_{\mathrm{blk}}(V) &= \lambda_1 \Omega(V).
+\end{align}
+The Euclidean gradient of the smooth part is
+\begin{equation}
+\nabla f_{\mathrm{blk}}(V) = -2\Sigmahat V + 2\lambda_2 L V.
+\end{equation}
+Because the feasible set is now the Stiefel manifold, the relevant first-order direction is the Riemannian gradient
+\begin{equation}
+\operatorname{grad} f_{\mathrm{blk}}(V)
+=
+\nabla f_{\mathrm{blk}}(V) - V\,\sym\!\left(V^\top \nabla f_{\mathrm{blk}}(V)\right).
+\end{equation}
+This geometry prevents the single-component ``threshold then project to the ball'' update from extending directly: orthogonalization mixes coordinates and can destroy sparsity if applied naively after Euclidean thresholding.
 
 % =========================
 % 5. Optimization
@@ -291,79 +312,50 @@ For completeness, the $\ell_1$ proximal operator is
 \paragraph{Practical step sizes.}
 For quadratics, $\nabla f$ is Lipschitz with constant $L_f = 2\|-\Sigmahat + \lambda_2 L\|_2$, so $\eta\in(0,1/L_f]$ is sufficient. In practice, $\eta$ can be selected by backtracking line search to ensure monotone descent of $F$.
 
-\subsection{\texorpdfstring{Practical Accelerated Variant\\ (MASPG-CAR)}{Practical Accelerated Variant (MASPG-CAR)}}
-Algorithm~\ref{alg:pg} is a clean baseline and the basis of our formal convergence result. For practical large-scale tuning and repeated solves across many regularization pairs, we recommend an enhanced variant that preserves the same exact composite proximal map while often improving wall-clock efficiency in practice.
+\subsection{Practical Solver Variant: MASPG-CAR}
+Beyond Algorithm~\ref{alg:pg}, our implementation includes a practical heuristic variant, MASPG-CAR, that combines Barzilai--Borwein step initialization, monotone inertial extrapolation with restart, continuation across $(\lambda_1,\lambda_2)$, and optional active-set refinement. Its purpose is to reduce repeated-solve cost over hyperparameter paths while preserving the same exact composite proximal map.
 
-\paragraph{Design principles.}
-The practical variant combines: (i) spectral (Barzilai--Borwein) step-size initialization, (ii) monotone inertial extrapolation with restart, (iii) continuation or warm starts over $(\lambda_1,\lambda_2)$, and (iv) optional active-set restricted refinement once support stabilizes. These modifications are standard acceleration heuristics in first-order optimization, but we present them as a \emph{practical} solver variant rather than as a replacement for the theorem-backed baseline.
+\paragraph{Scope of guarantees.}
+MASPG-CAR is not covered by the theorem below. In this paper it is treated strictly as an engineering comparison against the baseline proximal-gradient solver. The experimental section therefore reports it only through empirical iteration and runtime differences, together with any change in solution quality.
 
-\paragraph{Concrete choices (recommended defaults).}
-Let $d^k=w^k-w^{k-1}$ and $r^k=\nabla f(w^k)-\nabla f(w^{k-1})$. A practical BB initialization is
-\begin{equation}
-\eta_k^{\mathrm{BB}}=\mathrm{clip}\!\left(\frac{\langle d^k,d^k\rangle}{\langle d^k,r^k\rangle},\eta_{\min},\eta_{\max}\right)
-\end{equation}
-when $\langle d^k,r^k\rangle>0$, with fallback to the previous accepted step otherwise. We recommend a smooth-majorization backtracking test of the form
-\begin{equation}
-\begin{aligned}
-f(w_{\mathrm{trial}}^{k+1}) \le\; & f(y^k)
- + \langle \nabla f(y^k), w_{\mathrm{trial}}^{k+1}-y^k\rangle \\
-& + \frac{1}{2\eta_k}\|w_{\mathrm{trial}}^{k+1}-y^k\|_2^2,
-\end{aligned}
-\end{equation}
-which is guaranteed for sufficiently small $\eta_k$ under the Lipschitz-gradient assumption. Because inertial extrapolation can produce infeasible $y^k\notin\mathbb{B}_2$, we apply this test only to the smooth part $f$. In practice, we additionally enforce a monotonicity safeguard $F(w_{\mathrm{trial}}^{k+1})\le F(w^k)$ via restart.
+\subsection{Block Manifold Proximal Gradient}
+For the multi-component objective \eqref{eq:block_obj}, we use a practical block manifold proximal-gradient method. Starting from an orthonormal loading matrix $V^t$, the algorithm:
+\begin{enumerate}[leftmargin=*]
+\item computes the Riemannian gradient of the smooth block objective;
+\item takes a gradient step in the ambient space;
+\item applies either entrywise soft-thresholding ($\ell_1$ mode) or row-group shrinkage ($\ell_{2,1}$ mode);
+\item retracts the result back to the Stiefel manifold using a polar retraction, with QR as fallback.
+\end{enumerate}
+
+The resulting update can be written schematically as
+\begin{align}
+G^t_{\mathrm{R}} &= \operatorname{grad} f_{\mathrm{blk}}(V^t), \\
+Y^t &= V^t - \eta_t G^t_{\mathrm{R}}, \\
+Z^t &= \prox_{\eta_t \lambda_1 \Omega}(Y^t), \\
+V^{t+1} &= \operatorname{Retr}(Z^t),
+\end{align}
+with monotone backtracking on the full block objective. In $\ell_1$ mode, $\prox_{\eta_t \lambda_1 \Omega}$ is entrywise soft-thresholding. In $\ell_{2,1}$ mode, each row is shrunk by the usual group soft-thresholding rule. The implementation logs objective decrease, step size, relative iterate change, Riemannian gradient norm, support size, and orthogonality error.
 
 \begin{figure}[t]
 \centering
-\caption{MASPG-CAR: Monotone Accelerated Spectral Proximal Gradient with Continuation and Active-Set Refinement (practical variant)}
-\label{alg:maspg_car}
+\caption{Block Manifold Proximal Gradient for Multi-Component NC-SPCA}
+\label{alg:block_manpg}
 \begin{algorithmic}[1]
-\Require Data access for $\Sigmahat w$ (explicit or implicit), Laplacian $L$, regularizers $\lambda_1,\lambda_2$, initial point $w^0$, max iterations $K$
-\State Set $w^{-1}\gets w^0$, choose initial step $\eta_0>0$, choose $\beta_{\max}<1$, $\eta_{\min}>0$, $\eta_{\max}>\eta_{\min}$, shrink factor $\rho\in(0,1)$
-\State Choose support threshold $\varepsilon_{\mathrm{supp}}$ and support-stability window $m$; set continuation/warm-start order externally
-\For{$k=0,1,\dots,K-1$}
-  \State \textbf{(Inertial extrapolation)} choose $\beta_k\in[0,\beta_{\max})$ and set $y^k \gets w^k + \beta_k(w^k-w^{k-1})$
-  \State \textbf{(Spectral step initialization)} estimate trial $\eta_k$ (e.g., BB rule); clip to $[\eta_{\min},\eta_{\max}]$
-  \State \textbf{(Monotone backtracking)} repeat until descent condition holds:
-  \State \hspace{1em} $g^k \gets -2\Sigmahat y^k + 2\lambda_2 L y^k$
-  \State \hspace{1em} $v^k \gets y^k - \eta_k g^k$
-  \State \hspace{1em} $s^k \gets \soft(v^k,\eta_k\lambda_1)$
-  \State \hspace{1em} $w^{k+1}_{\mathrm{trial}} \gets s^k / \max\{1,\|s^k\|_2\}$
-  \State \hspace{1em} if sufficient decrease fails, set $\eta_k\gets \rho \eta_k$ and retry
-  \State \textbf{(Restart safeguard)} if $F(w^{k+1}_{\mathrm{trial}}) > F(w^k)$ then set $\beta_k\gets 0$, reset $y^k\gets w^k$, and rerun the backtracking block
-  \State Accept $w^{k+1}\gets w^{k+1}_{\mathrm{trial}}$
-  \State \textbf{(Optional active-set refinement)} if support (defined by $|w_i|>\varepsilon_{\mathrm{supp}}$) is unchanged for $m$ consecutive iterations, perform a few restricted updates on active coordinates
-  \State \textbf{(Stopping)} terminate if relative iterate change or objective change is below tolerance
+\Require Data matrix $X$, Laplacian $L$, regularizers $\lambda_1,\lambda_2$, component count $k$, initial orthonormal $V^0$
+\For{$t=0,1,\dots,K-1$}
+  \State $G^t \gets -2\Sigmahat V^t + 2\lambda_2 L V^t$
+  \State $G^t_{\mathrm{R}} \gets G^t - V^t \frac{(V^t)^\top G^t + (G^t)^\top V^t}{2}$
+  \State $Y^t \gets V^t - \eta_t G^t_{\mathrm{R}}$
+  \State $Z^t \gets \prox_{\eta_t \lambda_1 \Omega}(Y^t)$
+  \State $V^{t+1} \gets \operatorname{Retr}(Z^t)$
+  \State update $\eta_t$ by monotone backtracking if needed
 \EndFor
-\State \Return $w^K$
+\State \Return $V^K$
 \end{algorithmic}
 \end{figure}
 
 \paragraph{Scope of guarantees.}
-Algorithm~\ref{alg:maspg_car} is presented as a practical enhancement. The formal convergence theorem in this paper applies to the baseline proximal-gradient method (Algorithm~\ref{alg:pg}); in experiments, we recommend comparing the two directly in both runtime and solution quality.
-
-\paragraph{Relationship to Algorithm~\ref{alg:pg}.}
-Algorithm~\ref{alg:maspg_car} reduces to Algorithm~\ref{alg:pg} when $\beta_k=0$ for all $k$, continuation and active-set refinement are disabled, and the accepted step size is held fixed (or chosen by the same backtracking rule as Algorithm~\ref{alg:pg}).
-
-\subsection{Optimization Landscape and Multi-Component Extensions}
-The single-component problem analyzed here is nonconvex (because variance maximization is written as minimization of a negative quadratic), but it has a favorable composite structure: a smooth quadratic plus a convex nonsmooth term. This makes proximal-gradient methods natural and scalable.
-
-In contrast, multi-component formulations with $V^\top V=I_k$ add a nonconvex manifold constraint. A straightforward ``threshold then orthogonalize'' pipeline is unstable for sparsity because orthogonalization mixes coordinates and can re-densify loadings.
-
-Manifold proximal-gradient (ManPG-type) methods address this by solving a proximal subproblem in the tangent space of the Stiefel manifold and then retracting back to the manifold \cite{chen2020manpg,chen2020amanpg}. The graph Laplacian term contributes the smooth gradient term $2\lambda_2 L V$, so it fits naturally into the smooth part of such methods.
-
-\paragraph{Canonical tangent-space subproblem (informal).}
-At an iterate $V_t$ on the Stiefel manifold, ManPG-type methods solve a convex proximal subproblem over the tangent space
-\begin{equation}
-T_{V_t}\mathrm{St}(p,k)=\{\Delta\in\R^{p\times k}: V_t^\top \Delta + \Delta^\top V_t = 0\},
-\end{equation}
-of the form
-\begin{equation}
-\min_{\Delta\in T_{V_t}\mathrm{St}(p,k)}\;
-\langle \nabla F_{\mathrm{sm}}(V_t), \Delta\rangle
-+ \frac{1}{2\eta}\|\Delta\|_F^2
-+ \lambda_1 \Omega(V_t+\Delta),
-\end{equation}
-followed by a retraction $V_{t+1}=R_{V_t}(\gamma_t \Delta_t)$. Here $F_{\mathrm{sm}}(V)$ denotes the smooth part, including the variance and Laplacian terms. This construction preserves the role of proximal sparsity updates while respecting orthogonality.
+Algorithm~\ref{alg:block_manpg} is a practical manifold extension motivated by ManPG-type methods, but this paper does not claim a new convergence theorem for it. Our claims for the block method are therefore empirical: orthogonality preservation, recovery behavior under different sparsity structures, and runtime characteristics in controlled synthetic settings.
 
 % =========================
 % 6. Convergence
@@ -398,7 +390,7 @@ equivalently,
 where $N_{\mathbb{B}_2}(w^\star)$ denotes the normal cone of the unit $\ell_2$ ball at $w^\star$.
 \end{definition}
 
-\subsection{Main Guarantee}
+\subsection{Baseline PG Guarantee}
 \begin{theorem}[Convergence to critical points]
 \label{thm:conv}
 Suppose Assumptions 1--2 hold. Then the sequence $\{w^k\}$ generated by Algorithm~\ref{alg:pg} satisfies:
@@ -412,8 +404,11 @@ Suppose Assumptions 1--2 hold. Then the sequence $\{w^k\}$ generated by Algorith
 \paragraph{Proof sketch.}
 The proof uses the standard descent lemma for smooth functions and the characterization of the proximal-gradient step as minimizing a local quadratic upper bound of $f$ plus $h$. By Proposition~\ref{prop:prox-composition}, the implemented update is exactly this proximal-gradient step. Under Lipschitz continuity of $\nabla f$ and a sufficiently small step size, one obtains a sufficient-decrease inequality and summability of $\|w^{k+1}-w^k\|_2^2$, which implies asymptotic regularity. Criticality of accumulation points follows from standard limiting-subdifferential arguments for nonconvex composite minimization.
 
+\paragraph{Interpretation.}
+Theorem~\ref{thm:conv} is a standard proximal-gradient result instantiated for the specific objective in this paper. The technical interest here is not a new convergence paradigm, but the fact that the exact composite proximal step makes the baseline method particularly simple to implement for the graph-regularized ball-constrained objective.
+
 \paragraph{Stability note (multi-component extensions).}
-For multiple components with an orthogonality constraint $V^\top V=I_k$, naive thresholding followed by orthogonal projection generally destroys sparsity. In that setting, manifold proximal-gradient methods (e.g., ManPG-type schemes on the Stiefel manifold) are the appropriate analogue, because the proximal subproblem is solved in the tangent space before a retraction step.
+For multiple components with an orthogonality constraint $V^\top V=I_k$, naive thresholding followed by orthogonal projection generally destroys sparsity. The empirical block method used in this paper controls that issue through retraction-based manifold updates and maintains numerical orthogonality at machine precision in the reported synthetic runs, but its convergence is not covered by Theorem~\ref{thm:conv}.
 
 \paragraph{Remark on global convergence statements.}
 For manifold variants and alternating schemes, convergence claims typically require assumptions beyond Lipschitz smoothness (e.g., sufficient decrease and a suitable regularity/KL-type property). Accordingly, this paper restricts formal theorem statements to the single-component composite proximal-gradient algorithm above and treats manifold methods as principled extensions rather than proved results in this document.
@@ -421,7 +416,7 @@ For manifold variants and alternating schemes, convergence claims typically requ
 % =========================
 % 7. Experiments
 % =========================
-\section{Experimental Design}
+\section{Experimental Study}
 We evaluate whether incorporating network structure improves \emph{structured feature selection} and \emph{support recovery} relative to unstructured alternatives while preserving explained variance. The working hypothesis is conditional: graph regularization should help when the graph is informative and can fail when the graph is misspecified.
 
 \subsection{Synthetic Data and Graph Families}
@@ -432,7 +427,7 @@ We generate feature graphs $G$ from several families:
 (iv) stochastic block models (community structure).
 We construct ground-truth sparse loadings with connected support sets (when appropriate) and sample data from a spiked covariance model whose leading component aligns with the ground truth. This design isolates the effect of graph regularization on recovery while keeping the data-generating process controlled. It also makes failure modes easier to interpret because both the true support and the estimator graph are known.
 
-\subsection{Data-Generating Process (Recommended Default)}
+\subsection{Data-Generating Process}
 For a graph $G$ on $p$ nodes, let $S^\star\subseteq\{1,\dots,p\}$ denote a connected support set of size $s$. We define a ground-truth loading $w^\star\in\R^p$ with $\supp(w^\star)=S^\star$ and $\|w^\star\|_2=1$ (e.g., piecewise-smooth values over $S^\star$). A simple spiked covariance model is
 \begin{equation}
 \Sigma^\star = \sigma^2 I_p + \beta\, w^\star (w^\star)^\top,
@@ -440,35 +435,26 @@ For a graph $G$ on $p$ nodes, let $S^\star\subseteq\{1,\dots,p\}$ denote a conne
 with signal strength $\beta>0$ and noise level $\sigma^2>0$. Data are generated as $x_i\sim \mathcal{N}(0,\Sigma^\star)$ for $i=1,\dots,n$, and the centered design matrix $X$ is formed from the samples.
 
 \paragraph{Graph-quality stress tests.}
-To study robustness, we recommend perturbing the feature graph used by the estimator (while keeping $\Sigma^\star$ fixed), e.g., by edge deletion, edge rewiring, or weight noise. This directly probes sensitivity to graph misspecification.
+To study robustness, we also perturb the feature graph used by the estimator while keeping $\Sigma^\star$ fixed. The misspecification table below corresponds to edge perturbation at rate $0.1$, which directly probes sensitivity to graph mismatch.
 
-\subsection{Protocol and Hyperparameter Selection}
-For each graph family and signal-to-noise setting, we generate multiple random instances and report means with variability summaries (e.g., standard errors or interquartile ranges). Hyperparameters $(\lambda_1,\lambda_2)$ are selected by a validation criterion that balances explained variance and support quality, or by grid search against an oracle support metric in controlled simulations. We recommend reporting sensitivity curves to visualize the sparsity and smoothness trade-off frontier.
+\subsection{Reported Protocol}
+The aggregate benchmark tables are taken from the tracked paper-audit run over the four graph families above with three repeats per family and fixed regularization parameters $\lambda_1=0.15$ and $\lambda_2=0.25$. The optimization ablation compares baseline PG and MASPG-CAR over ten repeated synthetic runs under shared initialization and stopping rules. Separate chain-graph sweeps are used only for tradeoff visualization.
+
+\paragraph{Block-study protocol.}
+The multi-component results reported below use the native block manifold proximal-gradient implementation with $k=2$ components and five repeats per regime. We report four block regimes that are directly supported by the current code path: `grid/disjoint', `chain/shared', `rgg/disjoint', and `sbm/disjoint'. Unless stated otherwise, these runs use $n=60$, signal strength $\beta=8$, noise standard deviation $1$, $\lambda_1=0.15$, $\lambda_2=0.25$, and polar retraction.
 
 \paragraph{Reproducible protocol details.}
-To make results reproducible and comparable, we recommend fixing the following:
+The reported runs fix the following:
 \begin{itemize}[leftmargin=*]
-\item random seeds for graph generation, support generation, and Gaussian sampling;
-\item a predefined grid or path for $(\lambda_1,\lambda_2)$ (e.g., logarithmic grids);
-\item initialization strategy (leading PCA loading or warm start from neighboring hyperparameters);
-\item stopping criteria (maximum iterations, relative iterate change, and/or objective change);
-\item the number of Monte Carlo replicates per setting;
-\item a deterministic tie-breaking rule for support extraction when thresholding near-zero entries.
+\item graph families $\{$chain, grid, random geometric graph, SBM$\}$;
+\item three repeats per family for the aggregate audit tables;
+\item ten repeats for the PG vs.\ MASPG-CAR optimizer ablation;
+\item support extraction threshold $10^{-6}$;
+\item the combinatorial Laplacian in both optimization and reported Laplacian energy.
 \end{itemize}
 
-\paragraph{Example parameter grid and stopping rule.}
-A practical default is to use logarithmic grids after feature standardization, e.g.,
-\begin{equation}
-\begin{aligned}
-\lambda_1 &\in \{10^{-4},10^{-3.5},\dots,10^{-1}\}, \\
-\lambda_2 &\in \{10^{-4},10^{-3.5},\dots,10^{0}\},
-\end{aligned}
-\end{equation}
-with warm starts along each regularization path. Terminate when
-\begin{equation}
-\frac{\|w^{k+1}-w^k\|_2}{\max\{1,\|w^k\|_2\}} \le 10^{-6}
-\end{equation}
-or when a maximum iteration budget is reached.
+\paragraph{Tradeoff sweep used for figures.}
+The two sweep figures in this section come from a chain-graph run with $n=200$, $p=100$, support size $20$, signal strength $\beta=8$, noise standard deviation $1$, and a small grid over $\lambda_1\in\{0.1,0.2\}$ and $\lambda_2\in\{0,0.1\}$.
 
 \subsection{Baselines}
 We compare:
@@ -478,6 +464,7 @@ We compare:
 \item graph-regularized PCA (no sparsity; $\lambda_1=0$),
 \item the proposed method (graph regularization and sparsity).
 \end{itemize}
+For the multi-component study, the comparison is internal to the native block solver: entrywise $\ell_1$ sparsity versus row-wise $\ell_{2,1}$ sparsity under the same graph, initialization, and stopping rules.
 
 \subsection{Implementation and Scalability Considerations}
 For large $p$, each iteration is dominated by matrix-vector products with $\Sigmahat$ and $L$, plus the $O(p)$ soft-thresholding operation. When $L$ is sparse and $\Sigmahat w$ is computed implicitly via $X^\top(Xw)/n$, the method scales well to high-dimensional regimes. This structure also supports warm starts across a regularization path and straightforward parallelization across simulation replicates.
@@ -485,21 +472,8 @@ For large $p$, each iteration is dominated by matrix-vector products with $\Sigm
 \paragraph{Per-iteration complexity (implicit covariance implementation).}
 If $X$ is stored explicitly, computing $\Sigmahat w = X^\top(Xw)/n$ costs $O(np)$, and multiplying by a sparse Laplacian costs $O(|E|)$. Thus each iteration is approximately $O(np + |E|)$ plus lower-order vector operations. This makes the method practical when $k=1$ and the graph is sparse, even for large $p$.
 
-\subsection{Algorithmic Ablation Protocol (Baseline vs.\ Accelerated Variant)}
-To justify practical enhancements, we recommend a component-wise ablation comparing Algorithm~\ref{alg:pg} (baseline PG) and Algorithm~\ref{alg:maspg_car} (practical variant). Evaluate the following configurations:
-\begin{itemize}[leftmargin=*]
-\item baseline PG with fixed step or backtracking only;
-\item + spectral step initialization (BB);
-\item + inertial extrapolation with monotone restart;
-\item + continuation/warm starts across $(\lambda_1,\lambda_2)$;
-\item + active-set restricted refinement (full MASPG-CAR).
-\end{itemize}
-
-\paragraph{Ablation metrics.}
-For each configuration, report (i) final objective value, (ii) wall-clock time, (iii) iterations to tolerance, (iv) support F1 and LCC ratio, and (v) total runtime over the full hyperparameter grid. This isolates whether improvements come from faster convergence per solve or from better reuse across the regularization path.
-
-\paragraph{Fair-comparison rule.}
-All ablation variants should share the same stopping criteria, initialization policy, and support-thresholding convention used to compute metrics. This avoids attributing differences in solution quality to mismatched termination or post-processing rather than to the algorithmic component being tested.
+\subsection{Optimizer Ablation}
+The practical-variant comparison is restricted to baseline PG versus MASPG-CAR. Both solvers use the same objective, initialization policy, support-thresholding rule, and stopping tolerance, so any difference is attributable to the acceleration heuristics rather than to a changed objective or post-processing pipeline.
 
 \subsection{Evaluation Metrics}
 We report:
@@ -509,11 +483,12 @@ We report:
 \item structural coherence (largest connected-component ratio and Laplacian energy $w^\top L w$ within the selected support),
 \item runtime and iteration counts.
 \end{itemize}
+For the multi-component study, we additionally report permutation-invariant matched-support F1 across components, shared-support F1, and orthogonality error $\|V^\top V-I\|_F$.
 
 \subsection{Results}
 \begin{table}[t]
 \centering
-\caption{Aggregate synthetic benchmark results from the current audit run. Values are means across chain, grid, random geometric graph, and SBM families.}
+\caption{Aggregate synthetic benchmark results for the tracked synthetic study. Values are means across chain, grid, random geometric graph, and SBM families.}
 \label{tab:main_performance}
 \scriptsize
 \setlength{\tabcolsep}{3pt}
@@ -551,14 +526,76 @@ NetSPCA-MASPG-CAR & 9.221 & 0.403 & 1.000 & 0.0087 \\
 \normalsize
 \end{table}
 
-\paragraph{Current evidence from the repository.}
-In the base synthetic benchmark, $\ell_1$-SPCA achieves the highest mean support F1 among the core methods currently reported. The network-constrained variants remain close in F1 but do not exceed the unstructured sparse baseline in the current aggregate audit. Under graph misspecification, the gap in favor of unstructured $\ell_1$-SPCA widens further. For optimization, MASPG-CAR reduces average iterations relative to baseline PG, and continuation provides the clearest measured runtime gain over naive grid traversal.
+\paragraph{Primary empirical finding.}
+In the reported aggregate regime, $\ell_1$-SPCA achieves the highest mean support F1 among the core methods in both the base benchmark ($0.403$) and the misspecified-graph benchmark ($0.419$). The network-constrained variants remain close in F1 in the base setting ($0.397$) but do not exceed the unstructured sparse baseline, and the gap widens under graph misspecification ($0.403$ versus $0.419$). The aggregate LCC ratios are already near one for all sparse methods, so these tables do not support a strong claim of coherence gains in this regime.
 
-\paragraph{Optimization ablation summary.}
-The current ablation artifacts show that MASPG-CAR reduces the mean iteration count from $9.5$ to $6.0$ relative to baseline PG, with runtime changing from $0.0094$ s to $0.0090$ s in the audited setting. Continuation or warm-start traversal reduces total path iterations from $136$ to $91$, corresponding to a measured $1.43\times$ speedup over naive grid traversal.
+\begin{figure*}[t]
+\centering
+\begin{subfigure}[t]{0.48\textwidth}
+  \centering
+  \includegraphics[width=\textwidth]{variance_vs_sparsity.png}
+  \caption{Explained variance versus estimated support size in the chain-graph sweep.}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.48\textwidth}
+  \centering
+  \includegraphics[width=\textwidth]{connectivity_vs_lambda2.png}
+  \caption{LCC ratio versus $\lambda_2$ in the same sweep.}
+\end{subfigure}
+\caption{Measured tradeoff sweep for the chain-graph setting with $n=200$, $p=100$, support size $20$, signal strength $\beta=8$, and $\lambda_1\in\{0.1,0.2\}$, $\lambda_2\in\{0,0.1\}$. The sweep exposes the intended sparsity--variance tradeoff, but the connectivity metric remains saturated at one in this regime, so it does not provide evidence of a substantial aggregate coherence gain.}
+\label{fig:tradeoff_sweeps}
+\end{figure*}
 
-\paragraph{Expected qualitative trends.}
-When the graph prior is informative, increasing $\lambda_2$ should reduce Laplacian energy and improve support coherence (e.g., larger connected-component ratios) at a fixed sparsity level. Excessive graph regularization may over-smooth the loadings and reduce support precision or explained variance. Under graph misspecification, unstructured $\ell_1$-SPCA can match or exceed network-constrained variants on support F1, so the useful operating regime is a Pareto region rather than a single universally optimal parameter pair.
+\paragraph{Tradeoff interpretation.}
+Figure~\ref{fig:tradeoff_sweeps} makes the same point from a parameter-sweep perspective. In the present chain-graph sweep, increasing sparsity changes support size and explained variance in the expected direction, but increasing $\lambda_2$ does not yield a visible connectivity gain because the selected supports are already connected across the tested settings. The useful operating regime is therefore a Pareto region rather than a single universally superior parameter pair, and its location depends on graph quality.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{optimizer_ablation.png}
+\caption{Baseline PG versus MASPG-CAR over ten repeated synthetic runs. Error bars show sample standard deviations. MASPG-CAR reduces the iteration count from $9.5\pm0.53$ to $6.0\pm0.0$, while mean runtime changes only slightly from $0.01067\pm0.00026$ s to $0.01050\pm0.00022$ s.}
+\label{fig:optimizer_ablation}
+\end{figure}
+
+\paragraph{Practical optimization finding.}
+Figure~\ref{fig:optimizer_ablation} shows that MASPG-CAR is best understood as an engineering heuristic. In the audited ten-repeat comparison, it reduces iterations substantially, but the wall-clock effect is modest and support F1 is statistically indistinguishable from baseline PG. The continuation path experiment remains the clearest measured runtime gain, reducing total path iterations from $136$ to $91$ in the tracked sweep.
+
+\subsection{Multi-Component Block Results}
+\begin{table*}[t]
+\centering
+\caption{Two-component block NC-SPCA results for the native manifold proximal-gradient implementation. Means are over five repeats. The `grid/disjoint' regime uses a $4\times4$ grid with two disjoint supports of size four. The `chain/shared' regime uses a length-20 chain with two components sharing the same support. The `rgg/disjoint' and `sbm/disjoint' regimes use random geometric and stochastic block-model graphs with disjoint supports of size four.}
+\label{tab:block_results}
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabularx}{\textwidth}{@{}l l >{\centering\arraybackslash}p{1.5cm} >{\centering\arraybackslash}p{1.5cm} >{\centering\arraybackslash}p{1.5cm} >{\centering\arraybackslash}p{1.4cm} >{\centering\arraybackslash}p{1.6cm} >{\centering\arraybackslash}p{1.5cm}@{}}
+\toprule
+Regime & Sparsity & Matched F1 $\uparrow$ & Shared F1 $\uparrow$ & Mean LCC $\uparrow$ & Conv.\ Rate $\uparrow$ & Iterations $\downarrow$ & Time (s) $\downarrow$ \\
+\midrule
+grid/disjoint & $\ell_1$ & 0.400 & 0.667 & 1.000 & 1.00 & 130.4 & 0.0289 \\
+grid/disjoint & $\ell_{2,1}$ & 0.400 & 0.667 & 1.000 & 1.00 & 28.0 & 0.0066 \\
+chain/shared & $\ell_1$ & 0.344 & 0.342 & 0.768 & 0.40 & 346.6 & 0.0697 \\
+chain/shared & $\ell_{2,1}$ & 0.339 & 0.339 & 0.821 & 1.00 & 168.6 & 0.0407 \\
+rgg/disjoint & $\ell_1$ & 0.289 & 0.494 & 0.398 & 0.80 & 243.4 & 0.0572 \\
+rgg/disjoint & $\ell_{2,1}$ & 0.278 & 0.488 & 0.395 & 1.00 & 46.6 & 0.0113 \\
+sbm/disjoint & $\ell_1$ & 0.293 & 0.510 & 0.789 & 1.00 & 200.0 & 0.0513 \\
+sbm/disjoint & $\ell_{2,1}$ & 0.288 & 0.503 & 0.798 & 1.00 & 46.6 & 0.0178 \\
+\bottomrule
+\end{tabularx}
+\normalsize
+\end{table*}
+
+\paragraph{Block-method interpretation.}
+Table~\ref{tab:block_results} shows a clear regime dependence, but also a consistent optimization pattern. In the disjoint-support grid setting, entrywise $\ell_1$ and row-wise $\ell_{2,1}$ give the same matched-support and shared-support scores, but $\ell_{2,1}$ reaches that solution much faster, reducing mean iterations from $130.4$ to $28.0$. In the shared-support chain setting, the tradeoff changes: entrywise $\ell_1$ attains a slightly larger matched-support F1, but it converges in only $40\%$ of runs and has lower structural coherence. The row-sparse $\ell_{2,1}$ model converges in all runs, improves mean component connectivity from $0.768$ to $0.821$, and roughly halves both iteration count and runtime. The broader disjoint-support runs on random geometric and stochastic block-model graphs follow the same pattern: $\ell_{2,1}$ trades a small amount of matched-support F1 for materially better convergence behavior and substantially lower runtime. Across all eight settings, the orthogonality error remained at machine precision, with mean $\|V^\top V-I\|_F$ between $4.5\times 10^{-16}$ and $9.1\times 10^{-16}$.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.92\textwidth]{block_support_patterns.png}
+\caption{Fixed-seed shared-support chain example for the block method. The top row shows absolute loadings for the true loading matrix, the entrywise $\ell_1$ fit, and the row-sparse $\ell_{2,1}$ fit. The bottom row shows the corresponding thresholded supports. In this regime, the two components share the same true support. The row-sparse model preserves that structural bias more directly, whereas the entrywise model yields a more fragmented support pattern even when matched-support F1 remains similar.}
+\label{fig:block_support_patterns}
+\end{figure*}
+
+\paragraph{Qualitative support pattern.}
+Figure~\ref{fig:block_support_patterns} shows the regime in which the choice of sparsity model matters most. When the latent components truly share variables, the row-sparse formulation better reflects that inductive bias by suppressing isolated row activations. This is the main interpretive benefit of the block extension: not a universal F1 improvement, but a better alignment between the estimated support pattern and the structural prior encoded by the model class.
 
 % =========================
 % 8. Discussion
@@ -568,21 +605,21 @@ When the graph prior is informative, increasing $\lambda_2$ should reduce Laplac
 The Laplacian regularizer improves structural coherence only when the feature graph is informative. Misspecified, noisy, or overly dense graphs can induce over-smoothing, blur support boundaries, and degrade recovery. In practice, graph preprocessing (thresholding, normalization, confidence weighting) can materially affect results and should be documented.
 
 \paragraph{Single-component vs.\ multi-component formulations.}
-Our formal algorithmic and convergence results target a single component under an $\ell_2$-ball constraint. Extending to multiple components introduces orthogonality constraints and a different geometry. Manifold proximal-gradient methods provide a principled path forward, but their convergence and implementation details should be analyzed for the exact objective used.
+Our formal algorithmic and convergence results target a single component under an $\ell_2$-ball constraint. The multi-component extension introduces orthogonality constraints and a different geometry, so its method class is necessarily different. The present block experiments show that a native manifold proximal-gradient implementation is workable and numerically stable, but they also show that the preferred sparsity pattern depends on the scientific question: entrywise $\ell_1$ is competitive for disjoint supports, whereas row-wise $\ell_{2,1}$ is materially more stable when components are expected to share variables.
 
 \paragraph{High-dimensional inference and uncertainty quantification.}
 Optimization convergence alone does not imply statistical consistency or valid uncertainty quantification. In high-dimensional settings, inferential guarantees depend on signal strength, graph quality, regularization scaling, and model mismatch. A complete inference theory for graph-regularized SPCA (e.g., support recovery guarantees and perturbation bounds under graph misspecification) remains an important research direction.
 
 \paragraph{Applications and implications.}
-The framework is well motivated in genomics, finance, and sensor networks, where domain knowledge naturally induces feature graphs. In such settings, network-constrained SPCA can be viewed as a structured feature selection mechanism that trades off variance explanation against geometric coherence. Its practical value depends on whether the graph captures stable domain structure rather than transient correlations. Current synthetic audits in this repository support the caution that graph based methods are not uniformly dominant under misspecification.
+The framework is well motivated in genomics, finance, and sensor networks, where domain knowledge naturally induces feature graphs. In such settings, network-constrained SPCA can be viewed as a structured feature selection mechanism that trades off variance explanation against geometric coherence. Its practical value depends on whether the graph captures stable domain structure rather than transient correlations. The reported synthetic study supports the caution that graph-based methods are not uniformly dominant under misspecification.
 
 % =========================
 % 9. Conclusion
 % =========================
 \section{Conclusion}
-We studied a network-constrained SPCA objective that jointly promotes variance explanation, sparsity, and graph smoothness through a graph Laplacian regularizer. For the single-component, $\ell_2$ ball constrained formulation, the resulting method is an exact proximal-gradient algorithm with a closed-form composite proximal map and a standard convergence guarantee to critical points. We also clarified why multi-component sparse orthogonal formulations require manifold-aware proximal methods rather than naive thresholding followed by orthogonalization.
+We studied a network-constrained SPCA objective that jointly promotes variance explanation, sparsity, and graph smoothness through a graph Laplacian regularizer. For the single-component, $\ell_2$ ball constrained formulation, the resulting method is a simple proximal-gradient algorithm with a closed-form composite proximal map and a standard convergence guarantee to critical points. We also implemented a multi-component Stiefel-manifold extension and reported its empirical behavior under entrywise and row-structured sparsity.
 
-The main practical implication is that structural priors can be integrated into sparse dimensionality reduction without sacrificing first-order scalability. The main scientific caveat is that gains depend critically on graph quality and are not uniform across regimes. Future work should develop statistical recovery guarantees under graph misspecification, robust graph learning variants, and fully analyzed manifold proximal methods for multi-component network-constrained SPCA.
+The main practical implication is that structural priors can be integrated into sparse dimensionality reduction without sacrificing first-order scalability. The main empirical caveat is that this structural bias is conditionally useful rather than uniformly superior: in the present aggregate single-component regime, $\ell_1$-SPCA remains the strongest support-recovery baseline, and in the block regime the best sparsity model depends on whether supports are shared across components. Future work should develop statistical recovery guarantees under graph misspecification, robust graph learning variants, and a full convergence analysis for the block manifold proximal-gradient method used here.
 
 % =========================
 % Appendix

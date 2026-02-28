@@ -1,191 +1,134 @@
 # Gradient-Based Optimization for Network-Constrained Sparse PCA
 
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+This repository contains two layers:
 
-This repository provides a unified framework for **Sparse Principal Component Analysis (SPCA)** and **Network-Constrained Sparse PCA (NC-SPCA)**. It includes implementations of classic and state-of-the-art algorithms, evaluated on statistical benchmarks and high-dimensional biological data.
+1. the legacy benchmark and paper pipeline that produced the current experiments
+2. a new research-grade architecture under `src/nc_spca/` with typed config, compositional objectives and optimizers, and filesystem-first run tracking
 
----
+## Installation
 
-## 🚀 Quick Start
+```bash
+uv sync --dev
+```
 
-This project uses `uv` for modern, fast Python package management.
+Optional backends:
 
-### Installation
+```bash
+pip install torch geoopt wandb
+```
 
-1.  **Install `uv`** (if not already installed):
-    ```bash
-    pip install uv
-    ```
-2.  **Sync Dependencies:**
-    ```bash
-    uv sync
-    ```
-    For development checks (`ty`, `ruff`, `pytest`, `black`), use:
-    ```bash
-    uv sync --dev
-    ```
+## New architecture quick start
 
-3.  **Optional Torch backend dependencies** (only if you want PyTorch/Geoopt models):
-    ```bash
-    pip install torch geoopt
-    ```
+The new stack uses Hydra configs in `conf/` and writes reproducible outputs to `outputs/`.
 
-### Running Benchmarks
+Run the default synthetic NC-SPCA experiment:
 
-*   **Core synthetic comparison suite (paper baseline set):**
-    ```bash
-    uv run python scripts/run_experiment.py --n-repeats 3
-    ```
-    This runs: `PCA`, `L1-SPCA-ProxGrad`, `Graph-PCA`, `NetSPCA-PG`, `NetSPCA-MASPG-CAR`, `NetSPCA-ProxQN`, `GPower`, and `ElasticNet-SPCA`.
+```bash
+uv run nc-spca-run
+```
 
-*   **Run graph methods with Torch backend:**
-    ```bash
-    uv run python scripts/run_experiment.py --backend torch --n-repeats 3
-    ```
+Override the optimizer and objective from the command line:
 
-*   **Run manifold baseline with Torch+Geoopt:**
-    ```bash
-    uv run python scripts/run_experiment.py --backend torch-geoopt --include-stiefel-manifold --n-components 3 --n-repeats 3
-    ```
+```bash
+uv run nc-spca-run optimizer=prox_qn objective.lambda1=0.05 objective.lambda2=0.2
+```
 
-*   **Stress graph misspecification (graph-quality robustness):**
-    ```bash
-    uv run python scripts/run_experiment.py --dataset synthetic --graph-misspec-rate 0.15 --n-repeats 3
-    ```
+Use aligned method presets:
 
-*   **Multi-component benchmark with manifold baseline:**
-    ```bash
-    uv run python scripts/run_experiment.py --dataset synthetic --n-components 3 --include-stiefel-manifold --n-repeats 3
-    ```
+```bash
+uv run nc-spca-run method=pca data=pitprop experiment=real_pitprop
+uv run nc-spca-run method=nc_spca_block data=synthetic_grid data.n_samples=36 data.n_features=16 data.support_size=4 experiment.repeats=1
+uv run nc-spca-run method=nc_spca_block data=synthetic_grid data.n_components=2 data.support_overlap_mode=shared objective.sparsity_mode=l21 objective.group_lambda=0.05 experiment=block_synth_core
+```
 
-*   **Hyperparameter sweeps (`\lambda_1`, `\lambda_2`) with plots + LaTeX tables:**
-    ```bash
-    uv run python scripts/run_sweep.py --n-repeats 2
-    ```
+Run a Hydra multirun comparison:
 
-*   **Real dataset comparison (Colon / Pitprop):**
-    ```bash
-    uv run python scripts/run_experiment.py --dataset colon
-    uv run python scripts/run_experiment.py --dataset pitprop
-    ```
+```bash
+uv run nc-spca-sweep -m method=pca,l1_spca,graph_pca,nc_spca_pg,nc_spca_maspg_car,nc_spca_prox_qn data=pitprop experiment=real_pitprop
+```
 
-*   **One-command figure reproduction bundle:**
-    ```bash
-    uv run python scripts/reproduce_figures.py
-    ```
+Reproduce the default paper-style synthetic configuration:
 
-*   **Large-scale stress suite (`p >= 2000`):**
-    ```bash
-    uv run python scripts/run_large_scale_stress.py --n-features-grid 2000,3000 --n-repeats 1
-    ```
+```bash
+uv run nc-spca-reproduce experiment=paper_core
+```
 
-*   **Backend comparison (NumPy vs Torch vs Torch+Geoopt, when installed):**
-    ```bash
-    uv run python scripts/run_backend_comparison.py --n-repeats 3
-    ```
+Run the native multi-component block experiment:
 
-*   **Dynamic graph robustness experiment:**
-    ```bash
-    uv run python scripts/run_dynamic_graph_experiment.py --n-steps 5
-    ```
+```bash
+uv run nc-spca-run method=nc_spca_block experiment=block_synth_core data=synthetic_grid data.n_components=2 objective.sparsity_mode=l21
+```
 
-*   **Pinned paper artifact manifests:**
-    ```bash
-    uv run python scripts/reproduce_paper_artifacts.py
-    ```
+Generate the manuscript support-pattern figure for the shared-support block example:
 
-*   **Objective and convexity visualizations:**
-    ```bash
-    uv run python scripts/convexity_and_objectives.py
-    ```
+```bash
+.venv/bin/python scripts/plot_block_support_patterns.py --output doc/latex/figures/block_support_patterns.png
+```
 
----
+Inspect a finished run:
 
-## 🛠 Implemented Algorithms
+```bash
+uv run nc-spca-visualize outputs/nc_spca/paper_core/<run_id>
+```
 
-| Algorithm | Method | Reference |
-| :--- | :--- | :--- |
-| **Zou SPCA** | Elastic Net / Regression | Zou et al. (2006) |
-| **GPM** | Generalized Power Method | Journée et al. (2010) |
-| **NC-SPCA** | Laplacian Regularization / Proximal Grad | Wang Zhoufu (2026) |
-| **NC-SPCA (ProxQN)** | Proximal quasi-Newton (L-BFGS preconditioned prox-step) | This repository |
-| **NC-SPCA (Stiefel)** | Manifold proximal gradient + Stiefel retraction | Chen et al. (ManPG lineage) |
-| **NC-SPCA (Torch)** | PyTorch PG/MASPG-CAR backend | This repository |
-| **NC-SPCA (Torch + Geoopt)** | Geoopt Stiefel manifold backend | This repository |
+## New package layout
 
----
+- `conf/method/`
+- `src/nc_spca/objectives/`
+- `src/nc_spca/optimizers/`
+- `src/nc_spca/models/`
+- `src/nc_spca/experiments/`
+- `src/nc_spca/data/`
+- `src/nc_spca/metrics/`
+- `src/nc_spca/tracking/`
+- `src/nc_spca/config/`
+- `src/nc_spca/cli/`
+- `conf/`
 
-## 📊 Supported Datasets
+See `ARCHITECTURE.md` for the package boundaries and run artifact policy.
 
-1.  **Pitprop Dataset**: 13x13 correlation matrix of physical timber properties (Jeffers 1967).
-2.  **Colon Cancer**: Gene expression data (2000 genes, 62 samples) from Alon et al. (1999).
-3.  **Graph-Structured Synthetic Data**: configurable generators for **Chain, Grid, ER, RGG, and SBM** feature graphs with connected sparse supports.
+## Reproducibility contract
 
----
+Each new run records:
 
-## 📂 Project Structure
+- resolved config
+- environment manifest
+- git commit when available
+- metrics and event streams
+- seed manifest
+- checkpoints
+- tabular artifacts
 
-*   `src/models/`: Implementation of SPCA variants.
-*   `src/experiments/`: Reusable synthetic benchmark and comparison utilities.
-*   `data/`: Data loaders.
-*   `scripts/`: Reproducible experiment/sweep runners.
-*   `doc/`: Theoretical documentation, derivations, and publication drafts.
+The filesystem is the source of truth. Optional WandB logging mirrors local state when enabled.
 
-## Paper Review Workflow
+## Legacy benchmark stack
 
-For manuscript audit, citation cleanup, related-work review, and paper-to-code consistency checks, see:
+The existing comparison scripts and manuscript pipeline remain available during migration:
+
+- `scripts/run_experiment.py`
+- `scripts/run_sweep.py`
+- `scripts/reproduce_figures.py`
+- `scripts/reproduce_paper_artifacts.py`
+
+That stack still targets the older `src/models/`, `src/experiments/`, and `doc/` layout. New architecture work should go into `src/nc_spca/` and `conf/`.
+
+The new package CLI is now sufficient for:
+
+- baseline comparisons through `method=...`
+- synthetic single-model runs
+- real-data runs on `colon` and `pitprop`
+- native block manifold runs through `method=nc_spca_block`
+
+## Paper review workflow
+
+For manuscript audit, citation cleanup, related work review, and paper-to-code consistency checks, see:
 
 - `SCIENTIFIC_REVIEW_WORKFLOW.md`
 
----
-
-## ✅ CI
-
-CI is configured in `.github/workflows/ci.yml` and runs:
-
-- `uv run ruff check src/experiments src/models src/utils scripts tests`
-- `uv run black --check src/experiments src/models src/utils scripts tests`
-- `uv run pytest -q`
-
-## 🔒 Pre-commit Hook
-
-Install the local git hook:
+## Validation
 
 ```bash
-bash scripts/install_git_hooks.sh
+uv run ty check src/nc_spca tests/test_architecture_core.py tests/test_experiment_runner.py tests/test_cli_run.py tests/test_checkpointing.py tests/test_config_loader.py
+uv run ruff check src/nc_spca tests/test_architecture_core.py tests/test_experiment_runner.py tests/test_cli_run.py tests/test_checkpointing.py tests/test_config_loader.py
+uv run pytest -q
 ```
-
-The hook runs on every commit:
-
-- `uv run ty check src/experiments src/models src/utils scripts tests`
-- `uv run ruff check src/experiments src/models src/utils scripts tests`
-- `uv run pytest -q`
-
----
-
-## Core Motivation
-
-Classical PCA produces dense loading vectors, which are difficult to interpret in high-dimensional settings. Sparse PCA enforces sparsity for feature selection, but often ignores known relational structures between features (e.g., gene interaction networks). 
-
-**Network-Constrained SPCA** incorporates prior graph information via a Laplacian penalty:
-$$ \min_{\|w\|_2 \le 1} -w^\top \hat\Sigma w + \lambda_1 \|w\|_1 + \lambda_2 w^\top L w $$
-This encourages the selection of **connected, smooth supports** on the feature network, leading to more scientifically valid factor discovery.
-
-For regularization-path workflows, `NetworkSparsePCA.fit_path(...)` provides warm-start continuation across `lambda1`/`lambda2` grids with serpentine path ordering by default (`ordering="serpentine"`).
-
-Torch side-by-side backends are available as:
-
-- `TorchNetworkSparsePCA` (single-component PG/MASPG-CAR style)
-- `TorchNetworkSparsePCA_GeooptStiefel` (multi-component Stiefel manifold)
-
-For multi-component row-structured sparsity, `NetworkSparsePCA_StiefelStructured` provides an `L2,1`-regularized block update on the Stiefel manifold.
-
----
-
-## References
-
-*   Zou, H., Hastie, T., & Tibshirani, R. (2006). *Sparse Principal Component Analysis*.
-*   Journée, M., Nesterov, Y., Richtárik, P., & Sepulchre, R. (2010). *Generalized Power Method for Sparse Principal Component Analysis*.
-*   Qiu, Y., Lei, J., & Roeder, K. (2023). *Gradient-Based Sparse Principal Component Analysis with Extensions to Online Learning*.

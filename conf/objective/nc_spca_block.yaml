@@ -1,0 +1,7 @@
+name: nc_spca_block
+lambda1: 0.15
+lambda2: 0.25
+support_threshold: 1.0e-6
+sparsity_mode: l1
+group_lambda: null
+retraction: polar

@@ -5,10 +5,10 @@ ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
 echo "[pre-commit] running ty..."
-uv run ty check src/experiments src/models src/utils scripts tests
+uv run ty check src/nc_spca src/experiments src/models src/utils scripts tests
 
 echo "[pre-commit] running ruff..."
-uv run ruff check src/experiments src/models src/utils scripts tests
+uv run ruff check src/nc_spca src/experiments src/models src/utils scripts tests
 
 echo "[pre-commit] running pytest..."
 uv run pytest -q

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 
+import _bootstrap  # noqa: F401
 from src.experiments.synthetic_benchmark import (
     SyntheticBenchmarkConfig,
     build_baselines,

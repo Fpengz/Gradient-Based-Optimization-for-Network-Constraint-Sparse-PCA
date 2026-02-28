@@ -1,0 +1,11 @@
+name: synthetic_sbm
+n_samples: 200
+n_features: 96
+support_size: 18
+n_components: 1
+support_overlap_mode: disjoint
+signal_strength: 8.0
+noise_std: 1.0
+graph_type: sbm
+graph_laplacian_type: unnormalized
+random_state: 42

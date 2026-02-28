@@ -35,3 +35,7 @@ notebooks/.ipynb_checkpoints/
 
 # Experiment artifacts
 results/
+outputs/
+outputs_*/
+multirun/
+papers/**/build/

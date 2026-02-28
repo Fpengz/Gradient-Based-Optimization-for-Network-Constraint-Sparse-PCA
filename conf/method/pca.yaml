@@ -1,0 +1,5 @@
+# @package _global_
+defaults:
+  - override /model: pca
+  - override /objective: pca
+  - override /optimizer: pg

@@ -1,0 +1,4 @@
+name: paper_misspec
+repeats: 3
+seed: 42
+output_subdir: null

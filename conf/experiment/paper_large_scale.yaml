@@ -1,0 +1,4 @@
+name: paper_large_scale
+repeats: 3
+seed: 42
+output_subdir: null

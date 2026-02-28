@@ -1,0 +1,11 @@
+name: synthetic_grid
+n_samples: 200
+n_features: 100
+support_size: 16
+n_components: 1
+support_overlap_mode: disjoint
+signal_strength: 8.0
+noise_std: 1.0
+graph_type: grid
+graph_laplacian_type: unnormalized
+random_state: 42

@@ -1,0 +1,10 @@
+defaults:
+  - backend: numpy
+  - data: synthetic_chain
+  - model: nc_spca_single
+  - objective: nc_spca_single
+  - optimizer: pg
+  - method: nc_spca_pg
+  - experiment: paper_core
+  - tracking: local
+  - _self_
