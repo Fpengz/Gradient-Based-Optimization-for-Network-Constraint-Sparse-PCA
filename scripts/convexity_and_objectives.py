@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Any
 
 import matplotlib
 
@@ -9,7 +10,6 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import cm
 
 
 def _configure_style() -> None:
@@ -18,7 +18,7 @@ def _configure_style() -> None:
     plt.rcParams["font.size"] = 12
 
 
-def _plot_quadratic_form(ax: plt.Axes, matrix: np.ndarray, title: str) -> None:
+def _plot_quadratic_form(ax: Any, matrix: np.ndarray, title: str) -> None:
     x = np.linspace(-2.0, 2.0, 50)
     y = np.linspace(-2.0, 2.0, 50)
     grid_x, grid_y = np.meshgrid(x, y)
@@ -33,7 +33,7 @@ def _plot_quadratic_form(ax: plt.Axes, matrix: np.ndarray, title: str) -> None:
         grid_x,
         grid_y,
         values,
-        cmap=cm.coolwarm,
+        cmap="coolwarm",
         linewidth=0,
         antialiased=True,
         alpha=0.8,
@@ -97,7 +97,7 @@ def _plot_spca_contours(
 
 
 def _plot_spca_surface(
-    ax: plt.Axes, covariance: np.ndarray, lambda1: float, lambda2: float, title: str
+    ax: Any, covariance: np.ndarray, lambda1: float, lambda2: float, title: str
 ) -> None:
     radius = np.linspace(0.0, 1.0, 30)
     theta = np.linspace(0.0, 2.0 * np.pi, 60)
