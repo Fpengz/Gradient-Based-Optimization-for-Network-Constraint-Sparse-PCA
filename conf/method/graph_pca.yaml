@@ -1,5 +1,0 @@
-# @package _global_
-defaults:
-  - override /model: nc_spca_single
-  - override /objective: graph_pca
-  - override /optimizer: pg

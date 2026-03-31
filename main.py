@@ -1,16 +1,20 @@
-# This is a sample Python script.
-
-# Press ⌃F5 to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press F9 to toggle the breakpoint.
+import argparse
+import sys
+from pathlib import Path
 
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / "src"))
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+from grpca_gd.runner import run  # noqa: E402
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run GRPCA-GD experiments")
+    parser.add_argument("config", help="Path to YAML config")
+    args = parser.parse_args()
+    run(args.config)
+
+
+if __name__ == "__main__":
+    main()

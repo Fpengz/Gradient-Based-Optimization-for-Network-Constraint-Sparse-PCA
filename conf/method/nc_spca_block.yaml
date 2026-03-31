@@ -1,5 +1,0 @@
-# @package _global_
-defaults:
-  - override /model: nc_spca_block
-  - override /objective: nc_spca_block
-  - override /optimizer: manpg

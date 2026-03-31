@@ -1,4 +1,0 @@
-name: nc_spca_single
-lambda1: 0.15
-lambda2: 0.25
-support_threshold: 1.0e-6

@@ -1,5 +1,0 @@
-# @package _global_
-defaults:
-  - override /model: l1_spca
-  - override /objective: l1_spca
-  - override /optimizer: pg

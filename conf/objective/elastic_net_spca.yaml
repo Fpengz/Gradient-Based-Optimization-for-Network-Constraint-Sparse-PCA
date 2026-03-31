@@ -1,6 +1,0 @@
-name: elastic_net_spca
-lambda1: 0.15
-lambda2: 0.0
-support_threshold: 1.0e-6
-sparsity_mode: l1
-group_lambda: null

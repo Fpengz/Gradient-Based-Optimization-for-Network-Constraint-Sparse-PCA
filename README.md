@@ -1,134 +1,115 @@
-# Gradient-Based Optimization for Network-Constrained Sparse PCA
+# GRPCA-GD
 
-This repository contains two layers:
+Graph-smooth sparse orthogonal PCA with a split-variable solver and a synthetic-first evaluation. This repository contains the Track-A manuscript, code, and reproducible synthetic experiments.
 
-1. the legacy benchmark and paper pipeline that produced the current experiments
-2. a new research-grade architecture under `src/nc_spca/` with typed config, compositional objectives and optimizers, and filesystem-first run tracking
+## Methods Compared (Paper-1)
+- PCA (dense baseline)
+- Minimal A-ManPG (external sparse orthogonal baseline, no graph)
+- SparseNoGraph (in-family ablation with \(\lambda_2=0\))
+- Proposed (sparse + graph-smooth + joint orthogonality)
 
-## Installation
+## Experiments Included
+- Chain robustness (seeds 0–4)
+- SBM robustness (seeds 0–4)
+- SBM \(\lambda_2\) sweep (single seed)
 
-```bash
-uv sync --dev
-```
+## Quickstart
 
-Optional backends:
-
-```bash
-pip install torch geoopt wandb
-```
-
-## New architecture quick start
-
-The new stack uses Hydra configs in `conf/` and writes reproducible outputs to `outputs/`.
-
-Run the default synthetic NC-SPCA experiment:
+Run a smoke test (r=1, rho=5.0, eta_A=0.05):
 
 ```bash
-uv run nc-spca-run
+uv run python main.py configs/smoke_r1.yaml
 ```
 
-Override the optimizer and objective from the command line:
+Run the small r=3 config:
 
 ```bash
-uv run nc-spca-run optimizer=prox_qn objective.lambda1=0.05 objective.lambda2=0.2
+uv run python main.py configs/small_r3.yaml
 ```
 
-Use aligned method presets:
+## Reproduce Paper Results
+
+1) Run robustness configs (chain + SBM, seeds 0–4):
 
 ```bash
-uv run nc-spca-run method=pca data=pitprop experiment=real_pitprop
-uv run nc-spca-run method=nc_spca_block data=synthetic_grid data.n_samples=36 data.n_features=16 data.support_size=4 experiment.repeats=1
-uv run nc-spca-run method=nc_spca_block data=synthetic_grid data.n_components=2 data.support_overlap_mode=shared objective.sparsity_mode=l21 objective.group_lambda=0.05 experiment=block_synth_core
+for s in 0 1 2 3 4; do
+  uv run python main.py configs/robust_chain_seed${s}.yaml
+  uv run python main.py configs/robust_sbm_seed${s}.yaml
+ done
 ```
 
-Run a Hydra multirun comparison:
+2) Run SBM \(\lambda_2\) sweep:
 
 ```bash
-uv run nc-spca-sweep -m method=pca,l1_spca,graph_pca,nc_spca_pg,nc_spca_maspg_car,nc_spca_prox_qn data=pitprop experiment=real_pitprop
+for val in 0p00 0p05 0p10 0p20 0p50; do
+  uv run python main.py configs/sbm_lambda2_${val}.yaml
+ done
 ```
 
-Reproduce the default paper-style synthetic configuration:
+3) Regenerate the sweep panel figure:
 
 ```bash
-uv run nc-spca-reproduce experiment=paper_core
+uv run python - <<'PY'
+from pathlib import Path
+import json
+import numpy as np
+import matplotlib.pyplot as plt
+
+root = Path('outputs')
+order = ['0p00','0p05','0p10','0p20','0p50']
+lams = [0.0,0.05,0.1,0.2,0.5]
+
+support_f1 = []
+smooth_norm = []
+expl_var = []
+
+for tag in order:
+    metrics = json.loads((root / f'sbm_lambda2_{tag}' / 'metrics.json').read_text())
+    proposed = metrics['Proposed']
+    support_f1.append(proposed['support_metrics']['union']['f1'])
+    smooth_norm.append(proposed['graph_smoothness_norm_trueL'])
+    expl_var.append(proposed['shared_explained_variance'])
+
+fig, axes = plt.subplots(1, 3, figsize=(10, 3))
+axes[0].plot(lams, support_f1, marker='o')
+axes[0].set_title('Support F1')
+axes[0].set_xlabel('lambda2')
+
+axes[1].plot(lams, smooth_norm, marker='o')
+axes[1].set_title('Graph Smoothness (norm)')
+axes[1].set_xlabel('lambda2')
+
+axes[2].plot(lams, expl_var, marker='o')
+axes[2].set_title('Shared Explained Variance')
+axes[2].set_xlabel('lambda2')
+
+plt.tight_layout()
+Path('figures').mkdir(exist_ok=True)
+plt.savefig('figures/sbm_lambda2_sweep_panel.png', dpi=200)
+PY
 ```
 
-Run the native multi-component block experiment:
+4) Update tables in `latex/manuscript_sample.tex` using the newly generated outputs. The tables in the manuscript should match the means/stds computed from the `metrics.json` files in `outputs/`.
+
+## Manuscript Build
+
+Compile **from the repo root** (not from inside `latex/`):
 
 ```bash
-uv run nc-spca-run method=nc_spca_block experiment=block_synth_core data=synthetic_grid data.n_components=2 objective.sparsity_mode=l21
+pdflatex latex/manuscript_sample.tex
+(cd latex && bibtex manuscript_sample)
+pdflatex latex/manuscript_sample.tex
+pdflatex latex/manuscript_sample.tex
 ```
 
-Generate the manuscript support-pattern figure for the shared-support block example:
+## Outputs
+Each run writes to `outputs/<run_name>/`:
+- `artifacts.npz` and `artifacts.json`
+- `manifest.json`
+- `metrics.json` and `metrics.csv`
+- `plots/` convergence traces
 
-```bash
-.venv/bin/python scripts/plot_block_support_patterns.py --output doc/latex/figures/block_support_patterns.png
-```
+## Paper Snapshot
 
-Inspect a finished run:
-
-```bash
-uv run nc-spca-visualize outputs/nc_spca/paper_core/<run_id>
-```
-
-## New package layout
-
-- `conf/method/`
-- `src/nc_spca/objectives/`
-- `src/nc_spca/optimizers/`
-- `src/nc_spca/models/`
-- `src/nc_spca/experiments/`
-- `src/nc_spca/data/`
-- `src/nc_spca/metrics/`
-- `src/nc_spca/tracking/`
-- `src/nc_spca/config/`
-- `src/nc_spca/cli/`
-- `conf/`
-
-See `ARCHITECTURE.md` for the package boundaries and run artifact policy.
-
-## Reproducibility contract
-
-Each new run records:
-
-- resolved config
-- environment manifest
-- git commit when available
-- metrics and event streams
-- seed manifest
-- checkpoints
-- tabular artifacts
-
-The filesystem is the source of truth. Optional WandB logging mirrors local state when enabled.
-
-## Legacy benchmark stack
-
-The existing comparison scripts and manuscript pipeline remain available during migration:
-
-- `scripts/run_experiment.py`
-- `scripts/run_sweep.py`
-- `scripts/reproduce_figures.py`
-- `scripts/reproduce_paper_artifacts.py`
-
-That stack still targets the older `src/models/`, `src/experiments/`, and `doc/` layout. New architecture work should go into `src/nc_spca/` and `conf/`.
-
-The new package CLI is now sufficient for:
-
-- baseline comparisons through `method=...`
-- synthetic single-model runs
-- real-data runs on `colon` and `pitprop`
-- native block manifold runs through `method=nc_spca_block`
-
-## Paper review workflow
-
-For manuscript audit, citation cleanup, related work review, and paper-to-code consistency checks, see:
-
-- `SCIENTIFIC_REVIEW_WORKFLOW.md`
-
-## Validation
-
-```bash
-uv run ty check src/nc_spca tests/test_architecture_core.py tests/test_experiment_runner.py tests/test_cli_run.py tests/test_checkpointing.py tests/test_config_loader.py
-uv run ruff check src/nc_spca tests/test_architecture_core.py tests/test_experiment_runner.py tests/test_cli_run.py tests/test_checkpointing.py tests/test_config_loader.py
-uv run pytest -q
-```
+The frozen Track-A manuscript PDF is stored at:
+- `paper/paper1-trackA-v1.pdf`

@@ -1,5 +1,0 @@
-root_dir: outputs
-project: nc_spca
-enable_wandb: false
-wandb_project: null
-wandb_entity: null

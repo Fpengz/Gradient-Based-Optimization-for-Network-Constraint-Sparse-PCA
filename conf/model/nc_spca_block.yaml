@@ -1,4 +1,0 @@
-name: nc_spca_block
-n_components: 2
-init: pca
-random_state: 42

@@ -1,8 +1,0 @@
-name: maspg_car
-max_iter: 400
-learning_rate: auto
-tol: 1.0e-6
-monotone_backtracking: true
-qn_memory: 10
-support_threshold: 1.0e-8
-active_set_window: 10

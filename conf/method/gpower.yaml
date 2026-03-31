@@ -1,5 +1,0 @@
-# @package _global_
-defaults:
-  - override /model: gpower
-  - override /objective: gpower
-  - override /optimizer: pg
