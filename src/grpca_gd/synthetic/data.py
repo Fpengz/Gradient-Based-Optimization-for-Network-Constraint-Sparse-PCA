@@ -47,7 +47,8 @@ def build_covariance(
     if len(signal_eigs) != r:
         raise ValueError("signal_eigs length must match r")
     Lambda = np.diag(signal_eigs)
-    Sigma_signal = U @ Lambda @ U.T
+    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+        Sigma_signal = U @ Lambda @ U.T
     signal_power = float(np.trace(Sigma_signal)) / U.shape[0]
     if snr <= 0:
         raise ValueError("snr must be positive")
@@ -67,7 +68,8 @@ def sample_data(
         jitter = 1e-6 * np.eye(Sigma_true.shape[0])
         Lc = np.linalg.cholesky(Sigma_true + jitter)
     Z = rng.normal(size=(n, Sigma_true.shape[0]))
-    return Z @ Lc.T
+    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+        return Z @ Lc.T
 
 
 def generate_dataset(
@@ -98,7 +100,8 @@ def generate_dataset(
         extra_var = float(decoy_variance_factor) * sigma2
         Sigma_true[decoy_indices, decoy_indices] += extra_var
     X = sample_data(Sigma_true, n, rng)
-    Sigma_hat = (X.T @ X) / n
+    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+        Sigma_hat = (X.T @ X) / n
     metadata = {
         "seed": seed,
         "support_size": support_size,
