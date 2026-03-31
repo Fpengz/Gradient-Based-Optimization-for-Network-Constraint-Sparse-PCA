@@ -48,3 +48,5 @@ Upgrade the Track A empirical revision into a full-venue-ready submission by str
 - New theoretical convergence proofs.
 - Broad real-data benchmarks without clear alignment to the graph prior.
 - Major algorithm redesign or new optimization framework.
+
+**Current evidence status:** mixed-but-strengthened. Phase 1 identifies a narrow useful low-(\lambda_2) band ([0.05, 0.10]) in the high-decoy graph-aligned setting, with strong smoothness gains, no clear support-F1 penalty relative to SparseNoGraph, and clear improvement over A-ManPG across recovery and structural metrics. The benefit is tuning-sensitive and should not be interpreted as a broad recovery improvement claim.
