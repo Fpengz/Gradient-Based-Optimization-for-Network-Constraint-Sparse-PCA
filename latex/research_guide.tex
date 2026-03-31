@@ -1,0 +1,375 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[hypertexnames=false]{hyperref}
+\usepackage{url}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[backend=biber,style=numeric,sorting=nyt]{biblatex}
+\addbibresource{research_guide_references.bib}
+% Ensure that 'research_guide_references.bib' exists in the same directory as this .tex file.
+% If it is located elsewhere, update the path accordingly, e.g.:
+% \addbibresource{../references/research_guide_references.bib}
+
+\title{Research Guide: Graph-Smooth Sparse Orthogonal PCA Beyond Graph-Regularized PCA}
+\author{Internal Research Document}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Executive Summary}
+
+Recent work on Graph-Regularized PCA (GR-PCA) provides a principled framework for incorporating feature dependency structure into PCA through a learned feature graph and Laplacian regularization \cite{briola2026grpca}. The method is an important contribution to graph-aware dimensionality reduction, especially in settings where graph-coherent low-frequency structure is more meaningful than purely variance-maximizing directions. However, GR-PCA does not by itself solve the more specific problem of \emph{sparse, simultaneously orthogonal, graph-smooth multi-component PCA} under a modern manifold-based optimization framework \cite{chen2020amanpg,chen2024nonsmoothstiefel}.
+
+This document presents:
+\begin{itemize}
+    \item a revised gap analysis of GR-PCA and related graph-aware PCA methods,
+    \item a clearer separation between what is already known and what remains underexplored,
+    \item a proposed research direction centered on \textbf{graph-smooth sparse orthogonal PCA} rather than a broad claim about graph-aware sparse PCA in general.
+\end{itemize}
+
+\section{Problem Setting}
+
+Given centered data matrix $X \in \mathbb{R}^{n \times p}$ with sample covariance
+\[
+\widehat{\Sigma} = \frac{1}{n} X^\top X,
+\]
+classical PCA solves
+\[
+\max_{\|v\|_2 = 1} v^\top \widehat{\Sigma} v.
+\]
+
+Sparse PCA introduces sparsity, for example through an $\ell_1$ penalty \cite{zou2006spca}:
+\[
+\max_{\|v\|_2 = 1} v^\top \widehat{\Sigma} v - \lambda \|v\|_1.
+\]
+
+Graph-aware PCA augments this with structural regularization derived from a feature graph. In GR-PCA, the formulation is written in low-rank reconstruction form as \cite{briola2026grpca}
+\[
+\min_{U,V} \frac{1}{2}\|X - UV^\top\|_F^2
++ \alpha \sum_{j=1}^p \frac{\|V_{j:}\|_1}{1+d_j}
++ \frac{\lambda}{2}\operatorname{tr}(V^\top L V),
+\]
+where $L$ is the Laplacian of a graph inferred from a sparse precision matrix.
+
+\section{What GR-PCA Already Solves Well}
+
+GR-PCA has several genuine strengths \cite{briola2026grpca}:
+\begin{itemize}
+    \item it incorporates feature dependency structure through a graph learned from the data,
+    \item it combines sparsification and Laplacian regularization in one objective,
+    \item it is well motivated in regimes with graph-correlated high-frequency noise,
+    \item it produces graph-coherent and interpretable loading patterns in synthetic experiments.
+\end{itemize}
+
+Accordingly, the goal of the present research should \emph{not} be framed as replacing GR-PCA or claiming that graph-aware sparse PCA is absent from the literature. The more appropriate goal is to study a narrower and still underdeveloped intersection: sparse multi-component loading estimation that is simultaneously graph-smooth and explicitly orthogonal.
+
+\section{Revised Critical Gaps}
+
+\subsection{Gap 1: No Explicit Multi-Component Orthogonality Constraint}
+
+GR-PCA does not explicitly impose
+\[
+V^\top V = I.
+\]
+
+This matters because:
+\begin{itemize}
+    \item orthogonality is central to the classical interpretation of PCA,
+    \item without explicit orthogonality, multiple components may be rotation-ambiguous,
+    \item graph-coherent sparsification and multi-component decorrelation are left to interact implicitly rather than by design.
+\end{itemize}
+
+\textbf{Revised opportunity:} develop a formulation that explicitly enforces simultaneous orthogonality while retaining graph-aware sparse estimation \cite{chen2020amanpg,bertsimas2023geospca,cheng2026orthogonalspca}.
+
+\subsection{Gap 2: Two-Stage Graph Construction}
+
+GR-PCA first estimates a sparse precision matrix, then thresholds or extracts its support to form a feature graph, and only afterward solves the graph-regularized PCA problem \cite{briola2026grpca}.
+
+Pipeline:
+\begin{enumerate}
+    \item estimate sparse precision matrix $\widehat{\Theta}$,
+    \item construct graph from its support,
+    \item perform graph-regularized PCA using the resulting Laplacian.
+\end{enumerate}
+
+This creates several limitations:
+\begin{itemize}
+    \item graph estimation error can propagate into the PCA stage,
+    \item uncertainty in graph recovery is not modeled jointly with component estimation,
+    \item thresholding may discard useful continuous edge-strength information.
+\end{itemize}
+
+\textbf{Revised opportunity:} study joint, alternating, or bilevel graph-plus-component estimation, or explicitly analyze robustness to graph misspecification.
+
+\subsection{Gap 3: The Graph Prior Is Primarily a Smoothness Prior}
+
+The core structural regularizer in GR-PCA is
+\[
+\operatorname{tr}(V^\top L V),
+\]
+which is a Laplacian smoothness penalty \cite{briola2026grpca}.
+
+This is useful, but it encodes a specific inductive bias:
+\begin{itemize}
+    \item it favors low-frequency, graph-smooth loading patterns,
+    \item it does not explicitly model signed antagonistic structure,
+    \item it does not directly enforce localized discontinuities, subgraph selection, or connected-support constraints.
+\end{itemize}
+
+Thus, the limitation is \emph{not} that the method ignores graph structure, but that it relies on one particular notion of graph structure: smoothness.
+
+\textbf{Revised opportunity:}
+\begin{itemize}
+    \item signed or weighted Laplacian variants,
+    \item graph total variation penalties,
+    \item connected-support or subgraph-aware regularizers.
+\end{itemize}
+
+\subsection{Gap 4: Degree-Weighted Sparsity Is Not the Same as Structured Support Recovery}
+
+GR-PCA uses the weighted sparsity term
+\[
+\sum_{j=1}^p \frac{\|V_{j:}\|_1}{1+d_j},
+\]
+which penalizes low-degree features more strongly than high-degree ones \cite{briola2026grpca}.
+
+This is a deliberate design choice, but it has consequences:
+\begin{itemize}
+    \item it biases sparsity according to node degree,
+    \item it does not explicitly enforce connected or subgraph-structured supports,
+    \item it may be undesirable in applications where degree should not influence feature selection strength.
+\end{itemize}
+
+\textbf{Revised opportunity:}
+\begin{itemize}
+    \item graph-structured sparsity penalties,
+    \item overlapping-group penalties,
+    \item connected-support constraints,
+    \item row-sparse or component-shared support models when multiple components are expected to share variables.
+\end{itemize}
+
+\subsection{Gap 5: Evaluation Is Primarily Synthetic}
+
+The current GR-PCA study is built around synthetic experiments across graph topologies, noise regimes, and sparsity levels \cite{briola2026grpca}.
+
+This is valuable for isolating mechanisms, but it leaves open:
+\begin{itemize}
+    \item whether the method remains effective on noisy real feature graphs,
+    \item whether the graph prior is robust outside the controlled simulation setting,
+    \item whether interpretability gains persist in real scientific applications.
+\end{itemize}
+
+\textbf{Revised opportunity:}
+\begin{itemize}
+    \item gene expression with pathway or PPI graphs,
+    \item neuroimaging with spatial or connectivity graphs,
+    \item financial data with sector or supply-chain graphs,
+    \item sensor networks with spatial adjacency.
+\end{itemize}
+
+\subsection{Gap 6: Baseline Coverage Is Limited}
+
+GR-PCA is compared primarily against standard PCA and SparsePCA-style baselines \cite{briola2026grpca}.
+
+This leaves out several relevant comparison classes:
+\begin{itemize}
+    \item graph + sparsity PCA variants \cite{feng2019glspca,wu2019gdspca,wang2025rsspca},
+    \item joint orthogonal sparse PCA methods \cite{bertsimas2023geospca,cheng2026orthogonalspca},
+    \item manifold-based sparse PCA solvers \cite{chen2020amanpg},
+    \item structured sparse PCA baselines \cite{jenatton2010sspca}.
+\end{itemize}
+
+\textbf{Revised opportunity:} benchmark against a stricter baseline set so the contribution is evaluated relative to the most relevant parts of the literature rather than only to unstructured PCA.
+
+\subsection{Gap 7: Theory Is Incomplete Rather Than Absent}
+
+GR-PCA has a clear structural modeling rationale, but several questions remain open:
+\begin{itemize}
+    \item optimization convergence guarantees,
+    \item statistical consistency and support recovery theory,
+    \item robustness under graph misspecification,
+    \item sensitivity to graph estimation error.
+\end{itemize}
+
+This should be framed as \emph{incomplete theory}, not as a total lack of theory.
+
+\textbf{Revised opportunity:} provide convergence-to-stationarity guarantees for a proposed algorithm and, if possible, perturbation or robustness analysis with respect to graph errors.
+
+\subsection{Gap 8: The Optimization Challenge Is Stronger Than ``Gradient + Projection''}
+
+A key methodological caution is that the desired extension
+\[
+\max_{V^\top V = I}
+\operatorname{tr}(V^\top \widehat{\Sigma} V)
+- \lambda_1 \|V\|_1
+- \lambda_2 \operatorname{tr}(V^\top L V)
+\]
+is not naturally solved by simply applying Euclidean soft-thresholding and then projecting onto the Stiefel manifold.
+
+Why?
+\begin{itemize}
+    \item orthogonality introduces nonconvex manifold geometry,
+    \item the Laplacian term couples coefficients across features,
+    \item projection or retraction after naive thresholding may distort sparsity patterns.
+\end{itemize}
+
+\textbf{Revised opportunity:} formulate the method using a split-variable or manifold proximal framework rather than an overly naive projected-gradient description \cite{chen2020amanpg,chen2024nonsmoothstiefel,zhu2025stccal,li2024structurednonsmooth}.
+
+\section{Unified Open Problem}
+
+The meaningful open problem is not
+\begin{quote}
+``make graph-aware PCA sparse and gradient-based,''
+\end{quote}
+because partial versions of that already exist \cite{feng2019glspca,wu2019gdspca,wang2025rsspca}.
+
+A better formulation is:
+
+\begin{quote}
+Design a PCA-specific method that is simultaneously
+\begin{itemize}
+    \item sparse,
+    \item smooth on a known feature graph,
+    \item explicitly orthogonal across multiple components,
+    \item computationally practical,
+    \item and supported by convergence and robustness analysis.
+\end{itemize}
+\end{quote}
+
+\section{Revised Proposed Research Direction}
+
+\subsection{Safer Core Formulation}
+
+A more optimization-friendly formulation is a split-variable model:
+\[
+\min_{A^\top A = I_r,\; B}
+-\operatorname{tr}(A^\top \widehat{\Sigma} A)
++ \lambda_1 \|B\|_1
++ \lambda_2 \operatorname{tr}(B^\top L B)
++ \frac{\rho}{2}\|A-B\|_F^2.
+\]
+
+Interpretation:
+\begin{itemize}
+    \item $A$ carries orthogonality on the Stiefel manifold,
+    \item $B$ carries sparse graph-regularized structure in Euclidean space,
+    \item the quadratic coupling links the two.
+\end{itemize}
+
+This avoids presenting the problem as a trivial projected proximal-gradient extension.
+
+\subsection{Optimization Approach}
+
+A more defensible solver description is:
+\begin{itemize}
+    \item manifold-based updates for the orthogonality variable,
+    \item graph-coupled sparse updates for the Euclidean variable,
+    \item alternating optimization with convergence-to-stationarity as the initial theoretical goal.
+\end{itemize}
+
+Possible solver choices include:
+\begin{itemize}
+    \item first-order proximal or primal-dual updates for the graph-coupled sparse step,
+    \item semismooth Newton or related acceleration only as an extension,
+    \item retraction-based manifold updates for the orthogonality step.
+\end{itemize}
+
+\subsection{Revised Contribution Targets}
+
+The most realistic contribution targets are:
+\begin{enumerate}
+    \item a PCA-specific formulation combining graph smoothness, sparsity, and explicit orthogonality,
+    \item a practical alternating solver,
+    \item a rigorous empirical study of the variance--structure--interpretability tradeoff,
+    \item supportive convergence analysis to stationary points.
+\end{enumerate}
+
+The paper should \emph{not} be positioned as the first instance of graph-coupled nonsmooth manifold optimization in the abstract, because adjacent work already combines several of these ingredients outside PCA \cite{zhu2025stccal}.
+
+\section{Revised Theoretical Roadmap}
+
+A realistic theorem roadmap is:
+\begin{itemize}
+    \item lower boundedness and bounded iterates,
+    \item sufficient decrease of the alternating objective,
+    \item vanishing successive differences,
+    \item stationarity of accumulation points,
+    \item optional KL-style full-sequence convergence if cleanly provable.
+\end{itemize}
+
+Avoid leading with:
+\begin{itemize}
+    \item global optimality,
+    \item broad new manifold theory,
+    \item universal superiority over prior methods.
+\end{itemize}
+
+\section{Revised Experimental Roadmap}
+
+\subsection{Baselines}
+
+A stronger baseline set should include:
+\begin{itemize}
+    \item PCA,
+    \item standard sparse PCA,
+    \item GR-PCA,
+    \item graph + sparse PCA baselines,
+    \item joint orthogonal sparse PCA baselines,
+    \item your own ablations:
+    \begin{itemize}
+        \item no graph term,
+        \item no sparsity term,
+        \item deflation instead of joint extraction.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Metrics}
+
+Recommended metrics:
+\begin{itemize}
+    \item explained variance,
+    \item reconstruction error,
+    \item support recovery (precision, recall, F1),
+    \item subspace distance on synthetic data,
+    \item graph smoothness / Laplacian energy,
+    \item support connectivity metrics,
+    \item runtime and memory,
+    \item sensitivity to graph corruption.
+\end{itemize}
+
+\subsection{Datasets}
+
+Use:
+\begin{itemize}
+    \item synthetic graph-aligned data for controlled recovery studies,
+    \item one or two real domains only, chosen to match the graph prior.
+\end{itemize}
+
+\section{Revised Positioning Statement}
+
+\textbf{GR-PCA is a strong graph-aware PCA baseline, but it does not directly solve the specific problem of sparse, simultaneously orthogonal, graph-smooth multi-component PCA within a modern manifold-based optimization framework. Its graph prior is centered on Laplacian smoothness, its sparsity is degree-weighted rather than explicitly connected-support structured, and its empirical study is still primarily synthetic with limited baseline coverage.}
+
+This work should therefore be positioned as a targeted extension at the intersection of:
+\begin{itemize}
+    \item sparse PCA,
+    \item graph-aware PCA,
+    \item joint orthogonal component extraction,
+    \item and structured manifold optimization,
+\end{itemize}
+rather than as a broad claim that these ingredients have never been combined before.
+
+\section{Conclusion}
+
+Graph-aware PCA is no longer an empty research area, and graph+sparsity PCA is not absent from the literature. The defensible opportunity is narrower and more interesting: to study how sparse, explicitly orthogonal, graph-smooth multi-component PCA can be formulated and optimized in a way that is both practically useful and theoretically well supported. GR-PCA is best viewed as a strong foundation and comparison point, not as a strawman.
+
+\printbibliography
+
+\end{document}

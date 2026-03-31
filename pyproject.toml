@@ -1,0 +1,13 @@
+[project]
+name = "grpca-gd"
+version = "0.1.0"
+description = "Graph-smooth sparse orthogonal PCA scaffold"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "numpy",
+  "scipy",
+  "pyyaml",
+  "matplotlib",
+  "pytest",
+]

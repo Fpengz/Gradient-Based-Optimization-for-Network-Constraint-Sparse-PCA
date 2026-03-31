@@ -1,0 +1,420 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+% =========================
+% Packages
+% =========================
+\usepackage[margin=0.75in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{mathtools}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage[hypertexnames=false]{hyperref}
+\usepackage{url}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{enumitem}
+
+% =========================
+% Theorem Environments
+% =========================
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{assumption}{Assumption}
+\newtheorem{remark}{Remark}
+
+% =========================
+% Commands
+% =========================
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\stiefel}{\mathrm{St}}
+\newcommand{\Sigmahat}{\widehat{\Sigma}}
+\DeclareMathOperator{\prox}{prox}
+\DeclareMathOperator{\soft}{soft}
+\DeclareMathOperator{\supp}{supp}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\sym}{sym}
+\DeclareMathOperator{\dist}{dist}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\setlength{\columnsep}{0.25in}
+\setlength{\emergencystretch}{3em}
+\hbadness=10000
+\graphicspath{{figures/}}
+
+% =========================
+% Title
+% =========================
+\title{\texorpdfstring{Graph-Smooth Sparse Orthogonal PCA via Alternating Manifold and Graph-Coupled Proximal Updates}{Graph-Smooth Sparse Orthogonal PCA via Alternating Manifold and Graph-Coupled Proximal Updates}}
+\author{Wang Zhoufu}
+\date{}
+
+\begin{document}
+\sloppy
+\raggedbottom
+\maketitle
+
+% =========================
+% Abstract
+% =========================
+\begin{abstract}
+We study sparse, graph-smooth, explicitly orthogonal multi-component PCA through a split-variable formulation that couples an orthogonal loading matrix with a sparse graph-regularized proxy. We propose a concrete alternating solver consisting of a Stiefel manifold update for the orthogonal factor and a proximal-gradient update for the sparse graph-smooth factor. We evaluate the method on synthetic graph families using shared evaluation metrics (support recovery, graph smoothness on the true graph, and shared explained variance). In our synthetic experiments, graph regularization yields smoother solutions on the true graph, while its effect on support recovery is topology-dependent: on chain graphs the method is competitive on recovery and smoother on the true graph, whereas on SBM graphs stronger regularization induces a recovery–smoothness tradeoff and light regularization can improve smoothness with limited recovery loss. The paper is synthetic-first and modest in scope; broader theoretical guarantees and real-data validation are deferred.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introduction}
+
+Principal component analysis (PCA) is a foundational technique for dimensionality reduction, exploratory analysis, and low-dimensional representation learning. Its appeal stems from its simplicity and its optimality for variance maximization under orthogonality constraints. However, classical PCA typically produces dense loading vectors, so that each principal component depends on nearly all input variables. In modern high-dimensional applications such as genomics, neuroimaging, and structured sensing, these dense loadings can be difficult to interpret and of limited use for scientific discovery or feature selection \cite{zou2006spca,chen2020amanpg}.
+
+Sparse principal component analysis (SPCA) addresses this limitation by encouraging principal components to depend on only a small subset of variables. Over the past two decades, SPCA has been studied through several complementary formulations, including regression-based relaxations, power-method variants, and nonsmooth constrained optimization approaches \cite{zou2006spca,journee2010gpower,chen2020amanpg}. More recent work has emphasized the importance of handling sparsity and orthogonality in a principled manner, rather than relying solely on heuristic thresholding or post hoc orthogonalization. In particular, manifold-based formulations such as alternating manifold proximal-gradient methods show that sparse multi-component estimation can be treated directly as a nonsmooth optimization problem with orthogonality constraints, yielding stronger algorithmic structure and convergence guarantees than purely heuristic alternatives \cite{chen2020amanpg,chen2024nonsmoothstiefel}.
+
+Despite these advances, sparsity alone is often not enough. In many high-dimensional domains, features are not exchangeable but are linked through known relational structure. Genes participate in pathways and interaction networks, voxels exhibit spatial or functional connectivity, and pixels or spectral bands obey spatial adjacency and smoothness patterns. When such prior structure is available, it is natural to ask whether the extracted principal components should also respect it. A large literature on graph-aware and graph-regularized PCA studies how incorporating structural priors through graph-based penalties or low-frequency graph constraints can improve robustness and structural fidelity, especially when the signal is aligned with the underlying graph \cite{briola2026grpca}. At the same time, this literature also makes clear that graph-aware PCA is not a single unified model class: some methods emphasize low-frequency graph consistency, some include explicit sparsification, and others target application-specific clustering or representation objectives rather than sparse orthogonal component extraction \cite{briola2026grpca,feng2019glspca,wu2019gdspca,wang2025rsspca}.
+
+A second challenge concerns the extraction of multiple components. In classical PCA, orthogonality follows directly from eigendecomposition. In sparse settings, however, orthogonality is no longer automatic, and sequential deflation can produce components that are only approximately orthogonal or that degrade cumulatively in quality. This has motivated a continued line of work on simultaneous sparse orthogonal extraction, including recent efforts that explicitly revisit orthogonal SPCA as an active optimization problem rather than a solved issue \cite{chen2020amanpg,bertsimas2023geospca,cheng2026orthogonalspca}. These developments suggest that, when multiple interpretable components are required, joint extraction under explicit orthogonality constraints remains preferable to treating sparsity as a purely post-processing step.
+
+There is also a broader methodological backdrop. Beyond SPCA itself, recent work on nonsmooth and structured nonsmooth optimization over Riemannian submanifolds has substantially expanded the toolkit available for nonconvex problems with manifold constraints \cite{li2024structurednonsmooth,chen2024nonsmoothstiefel}. Moreover, adjacent problems such as sparse tensor canonical correlation analysis already combine Laplacian regularization, sparse penalties, manifold-based optimization, and modern inner solvers with convergence analysis \cite{zhu2025stccal}. Consequently, it is no longer accurate to position graph-coupled nonsmooth manifold optimization as an entirely unexplored conceptual territory. Rather, the more defensible and practically meaningful question is whether these ideas can be brought together in a coherent and effective framework for \emph{PCA proper}, with an explicit focus on sparse multi-component loading estimation under feature-graph smoothness and simultaneous orthogonality.
+
+This paper studies that question. We consider a formulation that combines three desiderata: sparse loadings, smoothness with respect to a known feature graph, and joint orthogonality across multiple extracted components. Our goal is not to claim that graph-aware PCA, graph+sparsity PCA, or nonsmooth manifold optimization are individually new. Instead, we focus on a comparatively underexplored intersection of these themes: \emph{feature-graph Laplacian regularization, sparse multi-component loadings, and explicit simultaneous orthogonality within a modern manifold/proximal optimization framework for PCA}. This positioning is narrower than a broad novelty claim, but it better reflects the current state of the literature and the genuine methodological gap that remains \cite{briola2026grpca,feng2019glspca,wu2019gdspca,chen2020amanpg}.
+
+Concretely, we introduce a graph-smooth sparse orthogonal PCA formulation in which orthogonality is handled through a Stiefel-constrained variable and structured sparse estimation is handled through a graph-regularized Euclidean variable coupled by a quadratic penalty. This split allows us to separate the geometry of orthogonality from the graph-coupled sparsity structure, while still optimizing the two jointly. The resulting viewpoint is particularly attractive in settings where interpretability is not just a matter of selecting a few variables, but of selecting variables whose pattern is coherent with known domain structure.
+
+Our study is guided by two central questions. First, when does feature-graph regularization improve the recovery of interpretable sparse components? Second, what tradeoff does graph regularization induce between explained variance, graph consistency, and computational cost? These questions are important because graph-based regularization can help when the prior graph is informative, but may oversmooth the loadings or reduce variance capture when the graph is misspecified. Accordingly, the paper emphasizes not only model design and optimization, but also the empirical circumstances under which graph priors are beneficial.
+
+\paragraph{Contributions.}
+The main contributions of this work are as follows.
+\begin{itemize}[leftmargin=*]
+\item We define a PCA-specific split-variable objective that couples explicit orthogonality with sparse graph-smooth loadings.
+    \item We specify a single alternating solver with explicit update rules for both the manifold and proximal steps.
+    \item We lay out a synthetic evaluation protocol with a complete baseline matrix and mandatory ablations that test the contribution of graph regularization, sparsity, and joint orthogonality.
+\end{itemize}
+
+Taken together, these contributions position the paper as a targeted integration of ideas that already exist in neighboring literatures, but whose precise combination for graph-smooth sparse orthogonal PCA remains comparatively underdeveloped. Our aim is therefore not to argue that every ingredient is new, but to show that their combination leads to a useful and well-motivated framework for structured dimensionality reduction in graph-informed high-dimensional settings.
+
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Sparse PCA and Orthogonal Component Extraction}
+Sparse principal component analysis has been studied through regression-based relaxations, truncated power methods, penalized matrix decomposition, semidefinite relaxations, and nonsmooth constrained optimization \cite{zou2006spca,witten2009pmd,daspremont2007dspca,journee2010gpower,qiu2023gradientspca}. A central theme in this literature is that sparse loadings improve interpretability but complicate both optimization and the extraction of multiple components.
+
+A particularly important line of work formulates SPCA directly as a nonsmooth optimization problem over orthogonality-constrained variables. Chen et al.\ proposed the alternating manifold proximal gradient framework (A-ManPG) for sparse PCA and sparse CCA, showing that sparse loadings and nonconvex orthogonality constraints can be handled within a unified manifold-based optimization scheme with convergence guarantees \cite{chen2020amanpg}. More broadly, the ManPG literature establishes a practical optimization template for smooth-plus-nonsmooth objectives on the Stiefel manifold \cite{chen2020manpg,chen2024nonsmoothstiefel}.
+
+Orthogonal sparse extraction also remains an active topic rather than a closed one. GeoSPCA emphasizes simultaneous extraction over deflation for orthogonal sparse components \cite{bertsimas2023geospca}, and recent work on certifiably optimal orthogonal SPCA further underscores ongoing interest in jointly enforcing sparsity, orthogonality, and strong optimality properties \cite{cheng2026orthogonalspca}. These developments motivate explicit joint orthogonality rather than treating it as an afterthought.
+
+\subsection{Graph-Aware PCA and Graph-Regularized Dimensionality Reduction}
+A parallel literature incorporates structural priors into PCA through graphs or Laplacian-type regularization. These methods are motivated by the observation that in many high-dimensional applications, features are not exchangeable but related through biological, spatial, or network structure. Graph-aware PCA methods use this prior information to bias principal components toward graph-consistent directions, often by suppressing high-frequency variation and preserving graph-coherent low-frequency signals \cite{briola2026grpca,chung1997spectral,shuman2013gsp}.
+
+Recent work makes it clear that graph-regularized PCA cannot simply be characterized as producing dense loadings. In particular, GR-PCA incorporates a learned sparse precision graph and regularizes PCA toward the low-frequency Fourier modes of the induced graph Laplacian; the method also evaluates sparsity-related behavior explicitly and reports improved structural fidelity, lower Laplacian energy, and competitive out-of-sample reconstruction under graph-aligned signals \cite{briola2026grpca}. This weakens any broad claim that graph-aware PCA is predominantly dense or uninterpretable.
+
+At the same time, graph-aware PCA does not fully eliminate the gap relevant here. Many graph-regularized variants focus primarily on graph consistency, robustness, clustering structure, or low-frequency filtering, rather than on simultaneous sparse multi-component orthogonality in a single PCA-specific framework. Accordingly, the relevant distinction is no longer whether graph-aware PCA exists, but whether it addresses the specific combination of sparse loadings, feature-graph smoothness, and explicit joint orthogonality considered here.
+
+\subsection{Graph + Sparsity PCA Variants}
+Older and application-driven papers already show that graph structure and sparsity have been combined within PCA-like models. For example, gLSPCA integrates a graph Laplacian term and a sparsity constraint into PCA for gene-expression analysis \cite{feng2019glspca}, while GDSPCA combines graph Laplacian regularization with double sparsity constraints to improve interpretability and exploit internal geometry \cite{wu2019gdspca}. These papers are direct counterexamples to any claim that graph+sparsity PCA is absent from the literature.
+
+However, these graph+sparsity PCA methods also illustrate why the gap must be phrased carefully. They are often application-specific, may target particular geometric or clustering objectives, and do not necessarily adopt the same optimization language as modern manifold proximal methods for joint orthogonal extraction. Recent applied work such as RSSPCA reinforces the same point: smooth sparse PCA variants continue to emerge in domain-specific settings, but they do not by themselves close the gap for feature-graph Laplacian regularization with explicit simultaneous orthogonal extraction in PCA proper \cite{wang2025rsspca}.
+
+\subsection{Structured Sparse PCA}
+Structured sparse PCA extends plain $\ell_1$-based sparsity by encouraging supports that follow meaningful patterns such as groups, trees, or contiguous regions. Jenatton, Obozinski, and Bach showed that structured regularization can impose higher-order information on the support of loading vectors and can improve interpretability relative to unstructured sparse PCA \cite{jenatton2010sspca}. This literature is highly relevant because it demonstrates that sparsity alone is often too weak a prior.
+
+Nevertheless, structured sparse PCA in this sense is not identical to feature-graph smoothness. Structured sparsity typically constrains the support geometry through groups or shapes, whereas graph-Laplacian regularization encourages neighboring or strongly connected features to take similar values. These are related but distinct inductive biases, and the existence of structured sparse PCA does not by itself resolve the specific question of how to jointly impose graph smoothness, sparsity, and simultaneous orthogonality in multi-component PCA.
+
+\subsection{Structured Nonsmooth Optimization on Manifolds}
+The optimization backdrop for this problem has evolved substantially. Beyond the sparse-PCA-specific literature, recent work on nonsmooth and structured nonsmooth optimization over Riemannian submanifolds shows that manifold-based methods now handle a broader class of composite objectives than earlier sparse-only formulations \cite{li2024structurednonsmooth,chen2024nonsmoothstiefel}. Recent adjacent work also combines sparse regularization, Laplacian regularization, manifold proximal updates, semismooth Newton subproblem solvers, and convergence analysis in related problems such as sparse tensor CCA \cite{zhu2025stccal}. That literature does not solve our PCA formulation directly, but it does weaken any broad claim that the optimization ingredients themselves are unprecedented.
+
+\subsection{Positioning of the Present Work}
+Graph-aware PCA and graph-regularized sparse PCA have been studied in multiple forms, and we do not claim novelty in combining graph smoothness with sparsity. The specific gap we target is the joint extraction of multiple explicitly orthogonal components under a split-variable formulation with a concrete, reproducible solver. Our work is positioned as a focused intersection of sparse PCA, graph-regularized PCA, and orthogonality-preserving optimization, rather than as a first instance of any single ingredient.
+
+\section{Problem Setup}
+\label{sec:setup}
+
+Let $X \in \R^{n \times p}$ be a centered data matrix and let
+\begin{equation}
+    \Sigmahat = \frac{1}{n} X^\top X
+\end{equation}
+denote the sample covariance matrix. Let $G=(\mathcal{V},\mathcal{E},W)$ be a weighted undirected feature graph on the $p$ variables, with adjacency matrix $W$, degree matrix $D$, and graph Laplacian
+\begin{equation}
+    L = D - W.
+\end{equation}
+We assume $L \succeq 0$.
+
+Our goal is to extract $r$ principal components with loading structure that is simultaneously sparse, graph-smooth, and orthogonal. To separate the geometry of orthogonality from the structured regularization, we introduce two variables $A,B \in \R^{p \times r}$:
+\begin{itemize}[leftmargin=*]
+    \item $A$ carries the orthogonality constraint $A^\top A = I_r$,
+    \item $B$ carries sparsity and graph smoothness.
+\end{itemize}
+
+We denote the Stiefel manifold by
+\begin{equation}
+    \stiefel(p,r) = \{ A \in \R^{p \times r} : A^\top A = I_r \}.
+\end{equation}
+
+\section{Proposed Formulation}
+\label{sec:formulation}
+
+We study the split formulation
+\begin{equation}
+\label{eq:main_obj}
+\begin{aligned}
+\min_{A \in \stiefel(p,r),\, B \in \R^{p \times r}} \quad
+&-\tr(A^\top \Sigmahat A)
++ \lambda_1 \|B\|_1 \\
+&+ \lambda_2 \tr(B^\top L B)
++ \frac{\rho}{2}\|A-B\|_F^2.
+\end{aligned}
+\end{equation}
+
+The first term promotes variance capture; the $\ell_1$ term promotes sparse loadings; the Laplacian term promotes graph smoothness; and the quadratic coupling term forces the orthogonal variable $A$ and the structured loading variable $B$ to remain close.
+
+\paragraph{Why split variables?}
+Directly optimizing a sparse graph-regularized objective under orthogonality constraints is difficult because the orthogonality constraint is nonconvex while the graph-sparsity regularizer is nonsmooth and coupled across features. The split formulation isolates these effects: $A$ is updated on the Stiefel manifold, while $B$ is updated in Euclidean space under structured regularization.
+
+We defer alternative sparsity structures to later work to keep the paper-1 formulation fixed to entrywise $\ell_1$ on $B$.
+
+\section{Optimization Algorithm}
+\label{sec:algorithm}
+
+We solve the split-variable objective by alternating between two steps. The $A$-step updates an orthogonal loading matrix on the Stiefel manifold using a Riemannian gradient step followed by QR-based retraction. The $B$-step updates the sparse graph-smooth proxy with proximal gradient, treating the Laplacian quadratic and coupling term as the smooth part and the $\ell_1$ penalty as the nonsmooth part. This single solver path is the primary algorithmic target for paper 1; more advanced variants are deferred.
+
+\subsection{A-Step: Manifold Update}
+With $B$ fixed, the $A$-subproblem is
+\begin{equation}
+\label{eq:A_subproblem}
+\min_{A \in \stiefel(p,r)}
+-\tr(A^\top \Sigmahat A)
++ \frac{\rho}{2}\|A-B\|_F^2.
+\end{equation}
+Its Euclidean gradient is
+\begin{equation}
+    \nabla_A f(A;B) = -2\Sigmahat A + \rho (A-B).
+\end{equation}
+The corresponding Riemannian gradient on $\stiefel(p,r)$ is
+\begin{equation}
+    \operatorname{grad} f(A;B)
+    = \nabla_A f(A;B) - A\,\sym\!\big(A^\top \nabla_A f(A;B)\big).
+\end{equation}
+We take a fixed-step manifold descent update with step size $\eta_A$ and retract back to the Stiefel manifold using QR retraction.
+
+\subsection{B-Step: Graph-Coupled Sparse Update}
+With $A$ fixed, the $B$-subproblem is
+\begin{equation}
+\label{eq:B_subproblem}
+\min_{B \in \R^{p \times r}}
+\lambda_1 \|B\|_1
++ \lambda_2 \tr(B^\top L B)
++ \frac{\rho}{2}\|A-B\|_F^2.
+\end{equation}
+This subproblem is convex in $B$ because $L \succeq 0$. We use a proximal-gradient update that treats the Laplacian quadratic and coupling term as the smooth part and the $\ell_1$ penalty as the nonsmooth part. Define
+\[
+g(B) = \lambda_2 \tr(B^\top L B) + \frac{\rho}{2}\|A-B\|_F^2,
+ \qquad
+h(B) = \lambda_1 \|B\|_1.
+\]
+Then
+\[
+\nabla g(B) = 2\lambda_2 L B + \rho(B-A).
+\]
+With step size $\eta_B = 1 / (2\lambda_2 \|L\|_2 + \rho)$, the update is
+\[
+B^{(t+1)} = \soft\!\big(B^{(t)} - \eta_B \nabla g(B^{(t)}), \eta_B \lambda_1\big).
+\]
+
+\subsection{Alternating Scheme}
+Algorithm~\ref{alg:alt} summarizes the outer loop.
+
+\begin{algorithm}[t]
+\caption{Alternating Manifold + Graph-Coupled Sparse Updates}
+\label{alg:alt}
+\begin{algorithmic}[1]
+\Require Centered data $X$, graph Laplacian $L$, parameters $\lambda_1,\lambda_2,\rho$, rank $r$
+\State Initialize $A^{(0)} \in \stiefel(p,r)$, $B^{(0)} \in \R^{p\times r}$
+\For{$t=0,1,\dots,T-1$}
+\State Update $A^{(t+1)}$ with one Riemannian gradient step and QR retraction
+\State Update $B^{(t+1)}$ with one proximal-gradient step and soft-thresholding
+    \If{stopping criterion satisfied}
+        \State \textbf{break}
+    \EndIf
+\EndFor
+\State \Return $(A^{(T)},B^{(T)})$
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Complexity.}
+The cost of the $A$-step is dominated by matrix multiplications and the chosen retraction. The $B$-step is typically the computational bottleneck because graph regularization introduces feature coupling and removes the closed-form separability available in plain soft-thresholding. When $L$ is sparse, matrix-vector operations remain efficient; dense or ill-conditioned graph operators can substantially increase runtime.
+
+\section{Convergence Analysis}
+\label{sec:theory}
+
+Our theoretical objective in paper 1 is modest: to motivate the alternating method and outline a convergence-to-stationarity roadmap under standard smoothness and boundedness assumptions. We do not claim global optimality, statistical consistency, or broad new manifold optimization theory. Full theoretical guarantees are deferred to later work once the algorithm and experimental results are stabilized.
+
+\subsection{Assumptions and Roadmap}
+We assume the following:
+\begin{itemize}[leftmargin=*]
+    \item $L \succeq 0$ and $\lambda_1,\lambda_2,\rho > 0$.
+    \item Step sizes satisfy standard Lipschitz or backtracking conditions for the proximal-gradient update.
+    \item Iterates remain in a bounded level set due to the quadratic coupling term.
+\end{itemize}
+Planned analysis targets for paper 1:
+\begin{itemize}[leftmargin=*]
+    \item lower bounded objective,
+    \item sufficient decrease or monotone descent of the objective,
+    \item vanishing successive differences,
+    \item stationarity of accumulation points.
+\end{itemize}
+
+\section{Experimental Setup}
+\label{sec:experiments}
+
+We evaluate the method in a synthetic-first protocol designed to isolate when graph smoothness helps. The protocol fixes graph families, support regimes, parameter ranges, and a complete baseline matrix, and includes mandatory ablations such as no-graph, no-sparsity, deflation, and graph corruption. All results report variance metrics, support recovery, smoothness, orthogonality error, and runtime. Real-data evaluation is explicitly excluded from paper 1.
+
+\subsection{Synthetic Experiments}
+Synthetic experiments are essential because the ground-truth support and latent subspace are known.
+\paragraph{Graph families.}
+Use the following families:
+\begin{itemize}[leftmargin=*]
+    \item chain graph,
+    \item 2D grid graph,
+    \item stochastic block model with three blocks (intra-p $0.2$, inter-p $0.02$),
+    \item random geometric graph (optional if budget allows).
+\end{itemize}
+
+\paragraph{Ground-truth supports.}
+Construct sparse supports that are:
+\begin{itemize}[leftmargin=*]
+    \item connected,
+    \item nearly connected (one edge removed),
+    \item disconnected (two subgraphs),
+    \item overlap regimes: disjoint supports and 50\% shared support.
+\end{itemize}
+
+\paragraph{Parameter sweeps.}
+Use the fixed ranges below:
+\begin{itemize}[leftmargin=*]
+    \item $n \in \{200, 500, 1000\}$,
+    \item $p \in \{200, 500, 1000\}$,
+    \item $r \in \{3, 5\}$,
+    \item sparsity $s \in \{10, 20, 40\}$,
+    \item SNR $\in \{0.5, 1, 2\}$,
+    \item graph corruption $\in \{0, 0.1, 0.3\}$,
+    \item $\lambda_1$ and $\lambda_2$ on a $5 \times 5$ log grid.
+\end{itemize}
+\paragraph{Replicates.}
+Run 20 replicates per configuration.
+
+\subsection{Baselines}
+Because graph+sparsity PCA already exists in the literature, comparisons against only PCA and plain SPCA are not enough. At minimum, include:
+\begin{enumerate}[leftmargin=*]
+    \item PCA,
+    \item standard sparse PCA,
+    \item a joint-orthogonal sparse PCA baseline,
+    \item a graph-aware PCA baseline,
+    \item a graph+sparsity PCA baseline,
+    \item your method without graph regularization,
+    \item your method without sparsity,
+    \item your method with deflation instead of joint extraction.
+\end{enumerate}
+
+\subsection{Metrics}
+Report metrics that match the claims:
+\paragraph{Statistical metrics.}
+Cumulative explained variance, reconstruction error, subspace distance to truth, orthogonality error.
+\paragraph{Support metrics.}
+Support size, precision, recall, F1, Jaccard overlap.
+\paragraph{Graph metrics.}
+Laplacian energy $\tr(B^\top L B)$, connected-component count or ratio on support, support smoothness.
+\paragraph{Optimization metrics.}
+Runtime, memory, outer iterations, inner iterations.
+\paragraph{Robustness metrics.}
+Sensitivity to graph corruption and bootstrap support stability.
+
+\section{Results}
+\label{sec:results}
+
+\paragraph{Overview.}
+We report synthetic results using shared evaluation metrics across all methods: union support F1, graph smoothness norm on the true graph, and a shared explained-variance measure computed from orthonormalized loadings. Shared explained variance is an evaluation metric and is not the training objective for any of the methods. We do not compare raw objective values across methods because they optimize different objectives. Results are presented for chain and SBM graphs across five seeds (0--4), and for a single-seed SBM sweep over $\lambda_2$.
+
+\subsection{Chain Robustness (Seeds 0--4)}
+Across seeds, PCA is consistently worst on support recovery. SparseNoGraph achieves the highest mean support F1, while the Proposed method attains slightly lower F1 but achieves a clearly lower graph smoothness norm on the true chain graph. Shared explained variance is similar across the two sparse methods and lower than PCA, as expected for sparse solutions. This pattern indicates that on chain graphs, graph regularization improves structural coherence while remaining competitive on recovery.
+\begin{table}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\caption{Chain robustness (seeds 0--4). Mean $\pm$ std for shared evaluation metrics.}
+\label{tab:chain-summary}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lccc}
+\toprule
+Method & Support F1 & Smoothness (norm) & Shared explained var \\
+\midrule
+PCA & 0.261 $\pm$ 0.000 & 2.099 $\pm$ 0.433 & 6.225 $\pm$ 0.363 \\
+SparseNoGraph & 0.950 $\pm$ 0.029 & 2.118 $\pm$ 0.426 & 6.092 $\pm$ 0.369 \\
+Proposed & 0.927 $\pm$ 0.017 & 1.871 $\pm$ 0.416 & 6.059 $\pm$ 0.372 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{SBM Robustness (Seeds 0--4)}
+On SBM graphs, PCA again performs worst on support recovery. SparseNoGraph attains substantially higher support F1 than the Proposed method, while the Proposed method is consistently smoother on the true SBM graph (lower normalized graph smoothness). Shared explained variance remains comparable across the two sparse methods. These results show a stable recovery--smoothness tradeoff on SBM: stronger graph regularization improves structural smoothness but can reduce recovery accuracy.
+\begin{table}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\caption{SBM robustness (seeds 0--4). Mean $\pm$ std for shared evaluation metrics.}
+\label{tab:sbm-summary}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lccc}
+\toprule
+Method & Support F1 & Smoothness (norm) & Shared explained var \\
+\midrule
+PCA & 0.261 $\pm$ 0.000 & 17.085 $\pm$ 0.871 & 6.225 $\pm$ 0.363 \\
+SparseNoGraph & 0.950 $\pm$ 0.029 & 17.166 $\pm$ 0.926 & 6.092 $\pm$ 0.369 \\
+Proposed & 0.744 $\pm$ 0.046 & 15.764 $\pm$ 0.988 & 6.003 $\pm$ 0.343 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{SBM \texorpdfstring{$\lambda_2$}{lambda2} Sweep (Seed 2)}
+Sweeping $\lambda_2 \in \{0.0, 0.05, 0.1, 0.2, 0.5\}$ reveals a monotone smoothness--recovery tradeoff. Light graph regularization improves smoothness with minimal loss in support F1, while larger $\lambda_2$ values steadily decrease support F1 and increase support density. Shared explained variance declines moderately as $\lambda_2$ grows. This sweep indicates that $\lambda_2$ must be tuned to graph topology; values that are benign on chains can oversmooth on SBM.
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../outputs/sbm_lambda2_sweep/lambda2_panel.png}
+\caption{SBM lambda2 sweep (seed 2). Light regularization improves smoothness with limited recovery loss, while stronger regularization oversmooths and degrades support recovery.}
+\label{fig:sbm-lambda2-sweep}
+\end{figure}
+
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+These experiments establish a focused empirical message: in our synthetic experiments, graph regularization yields smoother solutions on the true graph for both chain and SBM settings, but its effect on support recovery is topology-dependent. On chain graphs, the proposed method remains competitive on recovery while producing smoother supports, consistent with the intuition that chain structure aligns well with Laplacian smoothness. On SBM graphs, the graph prior enforces smoother structure at the cost of recovery accuracy, yielding a stable tradeoff rather than a contradiction.
+
+The chain setting aligns naturally with local smoothness, whereas the SBM setting emphasizes block/community structure; as a result, the same smoothness penalty can act as a mild regularizer in one topology and as an oversmoothing force in another. The $\lambda_2$ sweep on SBM makes this explicit: mild regularization yields smoother solutions with limited recovery loss, whereas stronger regularization oversmooths and reduces recovery. These observations imply that $\lambda_2$ must be tuned with respect to graph topology rather than assumed to be universally beneficial.
+
+The main limitation of the current evidence is that it remains synthetic and focuses on two graph families with a single data generator. This is appropriate for Paper 1, whose goal is to establish a disciplined method and a clear empirical tradeoff. The results already demonstrate that structural priors can improve graph coherence, but they also show that regularization strength must be tuned to topology. This is a valid and useful contribution at the current scope.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+We present synthetic evidence that graph-regularized sparse orthogonal PCA improves structural coherence while inducing a topology-dependent tradeoff with support recovery. On chain graphs, the proposed method is competitive on recovery and yields smoother supports; on SBM graphs, stronger graph regularization improves smoothness but reduces recovery accuracy. These findings highlight the need for topology-aware $\lambda_2$ tuning and support a modest, defensible Paper-1 claim: graph regularization can improve structural coherence, but its effect on recovery depends on graph topology and regularization strength.
+
+\appendix
+
+\section{Proof Sketches and Deferred Arguments}
+\label{app:proofs}
+This appendix is a placeholder for proof details, technical lemmas, and auxiliary propositions.
+
+\section{Additional Experimental Details}
+\label{app:exp}
+This appendix is a placeholder for hyperparameter grids, implementation details, dataset preprocessing, and ablation tables.
+
+\fussy
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

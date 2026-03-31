@@ -1,0 +1,19 @@
+# <type>(<scope>): <subject>
+#
+# <body - context and why>
+#
+# <footer - breaking changes, issue refs>
+#
+# Types: 
+#   feat     : A new feature
+#   fix      : A bug fix
+#   chore    : Build process or auxiliary tool changes
+#   docs     : Documentation only changes
+#   style    : Formatting, missing semi-colons, etc; no code change
+#   refactor : A code change that neither fixes a bug nor adds a feature
+#   perf     : A code change that improves performance
+#   test     : Adding missing tests or correcting existing tests
+#
+# Subject: imperative, lowercase, no period (e.g. "add login support")
+# Body: provide context, why the change is needed
+# Footer: breaking changes, issue refs (e.g. "Closes JIRA-123")
