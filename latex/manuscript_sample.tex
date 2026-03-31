@@ -90,9 +90,9 @@ Our study is guided by two central questions. First, when does feature-graph reg
 \paragraph{Contributions.}
 The main contributions of this work are as follows.
 \begin{itemize}[leftmargin=*]
-\item We define a PCA-specific split-variable objective that couples explicit orthogonality with sparse graph-smooth loadings.
-    \item We specify a single alternating solver with explicit update rules for both the manifold and proximal steps.
-    \item We lay out a synthetic evaluation protocol with a complete baseline matrix and mandatory ablations that test the contribution of graph regularization, sparsity, and joint orthogonality.
+    \item We study an executed synthetic PCA protocol with four methods only: PCA, A-ManPG, SparseNoGraph, and the Proposed method.
+    \item We restrict the empirical scope to chain and SBM graphs, five random seeds ($0$--$4$), and shared evaluation metrics only.
+    \item We distinguish SparseNoGraph as an in-family ablation with $\lambda_2=0$ from A-ManPG as the minimal external sparse baseline without graph coupling.
 \end{itemize}
 
 Taken together, these contributions position the paper as a targeted integration of ideas that already exist in neighboring literatures, but whose precise combination for graph-smooth sparse orthogonal PCA remains comparatively underdeveloped. Our aim is therefore not to argue that every ingredient is new, but to show that their combination leads to a useful and well-motivated framework for structured dimensionality reduction in graph-informed high-dimensional settings.
@@ -142,6 +142,7 @@ denote the sample covariance matrix. Let $G=(\mathcal{V},\mathcal{E},W)$ be a we
     L = D - W.
 \end{equation}
 We assume $L \succeq 0$.
+We use $\|M\|_1$ for the entrywise $\ell_1$ norm, $\soft(Z,\tau)$ for entrywise soft-thresholding at threshold $\tau$, and $\sym(M) = (M+M^\top)/2$ for the symmetric part of a matrix. Shared explained variance is computed after QR-based orthonormalization of the loading matrix.
 
 Our goal is to extract $r$ principal components with loading structure that is simultaneously sparse, graph-smooth, and orthogonal. To separate the geometry of orthogonality from the structured regularization, we introduce two variables $A,B \in \R^{p \times r}$:
 \begin{itemize}[leftmargin=*]
@@ -247,99 +248,56 @@ Algorithm~\ref{alg:alt} summarizes the outer loop.
 \paragraph{Complexity.}
 The cost of the $A$-step is dominated by matrix multiplications and the chosen retraction. The $B$-step is typically the computational bottleneck because graph regularization introduces feature coupling and removes the closed-form separability available in plain soft-thresholding. When $L$ is sparse, matrix-vector operations remain efficient; dense or ill-conditioned graph operators can substantially increase runtime.
 
-\section{Convergence Analysis}
+\section{Optimization Discussion}
 \label{sec:theory}
 
-Our theoretical objective in paper 1 is modest: to motivate the alternating method and outline a convergence-to-stationarity roadmap under standard smoothness and boundedness assumptions. We do not claim global optimality, statistical consistency, or broad new manifold optimization theory. Full theoretical guarantees are deferred to later work once the algorithm and experimental results are stabilized.
+The objective in \eqref{eq:main_obj} is nonconvex because it combines a Stiefel constraint on $A$ with a quadratic coupling term between $A$ and $B$. For fixed $A$, however, the $B$-subproblem is convex because it is the sum of a convex quadratic term and the entrywise $\ell_1$ norm.
 
-\subsection{Assumptions and Roadmap}
-We assume the following:
+\subsection{Updates Used}
+The implemented solver alternates between two explicit updates. The $A$-step takes one retracted Riemannian gradient step on $\stiefel(p,r)$ using the Euclidean gradient from the manifold objective and QR retraction back to the manifold. The $B$-step takes one proximal-gradient step, with the smooth part given by the Laplacian quadratic and coupling term and the nonsmooth part given by $\lambda_1 \|B\|_1$.
+
+The step size for the $A$-step is fixed at the experimental value $\eta_A=0.05$. The $B$-step uses
+\[
+\eta_B = \frac{1}{2\lambda_2 \|L\|_2 + \rho},
+\]
+which matches the Lipschitz constant of the smooth part in the Euclidean update.
+
+\subsection{Stopping Criteria}
+The outer loop stops when any of the following is satisfied:
 \begin{itemize}[leftmargin=*]
-    \item $L \succeq 0$ and $\lambda_1,\lambda_2,\rho > 0$.
-    \item Step sizes satisfy standard Lipschitz or backtracking conditions for the proximal-gradient update.
-    \item Iterates remain in a bounded level set due to the quadratic coupling term.
+    \item relative objective change falls below a tolerance,
+    \item the coupling gap $\|A-B\|_F$ falls below a tolerance,
+    \item the orthogonality defect $\|A^\top A - I_r\|_F$ falls below a tolerance,
+    \item the maximum iteration count is reached.
 \end{itemize}
-Planned analysis targets for paper 1:
-\begin{itemize}[leftmargin=*]
-    \item lower bounded objective,
-    \item sufficient decrease or monotone descent of the objective,
-    \item vanishing successive differences,
-    \item stationarity of accumulation points.
-\end{itemize}
+
+This section is intentionally descriptive rather than a proof development: we do not provide a formal convergence proof here, and formal analysis is out of scope for this manuscript.
 
 \section{Experimental Setup}
 \label{sec:experiments}
 
-We evaluate the method in a synthetic-first protocol designed to isolate when graph smoothness helps. The protocol fixes graph families, support regimes, parameter ranges, and a complete baseline matrix, and includes mandatory ablations such as no-graph, no-sparsity, deflation, and graph corruption. All results report variance metrics, support recovery, smoothness, orthogonality error, and runtime. Real-data evaluation is explicitly excluded from paper 1.
+We evaluate only the executed synthetic study. The comparison set is limited to PCA, A-ManPG, SparseNoGraph, and the Proposed method. SparseNoGraph is the in-family ablation with $\lambda_2=0$, while A-ManPG is the minimal external sparse orthogonal baseline without graph coupling. The graph families are chain and SBM, and all main results use seeds $0$--$4$. Shared evaluation metrics only are reported: support recovery, graph smoothness on the true graph, and shared explained variance. The explained-variance quantity is an evaluation metric computed after QR-based orthonormalization, not a training objective for any method.
 
-\subsection{Synthetic Experiments}
-Synthetic experiments are essential because the ground-truth support and latent subspace are known.
-\paragraph{Graph families.}
-Use the following families:
+\subsection{Main Runs}
+The main runs use the following hyperparameters unless otherwise stated:
 \begin{itemize}[leftmargin=*]
-    \item chain graph,
-    \item 2D grid graph,
-    \item stochastic block model with three blocks (intra-p $0.2$, inter-p $0.02$),
-    \item random geometric graph (optional if budget allows).
+    \item $\lambda_1=0.1$,
+    \item $\lambda_2=0.1$,
+    \item $\rho=5.0$,
+    \item $\eta_A=0.05$.
 \end{itemize}
 
-\paragraph{Ground-truth supports.}
-Construct sparse supports that are:
-\begin{itemize}[leftmargin=*]
-    \item connected,
-    \item nearly connected (one edge removed),
-    \item disconnected (two subgraphs),
-    \item overlap regimes: disjoint supports and 50\% shared support.
-\end{itemize}
-
-\paragraph{Parameter sweeps.}
-Use the fixed ranges below:
-\begin{itemize}[leftmargin=*]
-    \item $n \in \{200, 500, 1000\}$,
-    \item $p \in \{200, 500, 1000\}$,
-    \item $r \in \{3, 5\}$,
-    \item sparsity $s \in \{10, 20, 40\}$,
-    \item SNR $\in \{0.5, 1, 2\}$,
-    \item graph corruption $\in \{0, 0.1, 0.3\}$,
-    \item $\lambda_1$ and $\lambda_2$ on a $5 \times 5$ log grid.
-\end{itemize}
-\paragraph{Replicates.}
-Run 20 replicates per configuration.
-
-\subsection{Baselines}
-Because graph+sparsity PCA already exists in the literature, comparisons against only PCA and plain SPCA are not enough. At minimum, include:
-\begin{enumerate}[leftmargin=*]
-    \item PCA,
-    \item standard sparse PCA,
-    \item a joint-orthogonal sparse PCA baseline,
-    \item a graph-aware PCA baseline,
-    \item a graph+sparsity PCA baseline,
-    \item your method without graph regularization,
-    \item your method without sparsity,
-    \item your method with deflation instead of joint extraction.
-\end{enumerate}
-
-\subsection{Metrics}
-Report metrics that match the claims:
-\paragraph{Statistical metrics.}
-Cumulative explained variance, reconstruction error, subspace distance to truth, orthogonality error.
-\paragraph{Support metrics.}
-Support size, precision, recall, F1, Jaccard overlap.
-\paragraph{Graph metrics.}
-Laplacian energy $\tr(B^\top L B)$, connected-component count or ratio on support, support smoothness.
-\paragraph{Optimization metrics.}
-Runtime, memory, outer iterations, inner iterations.
-\paragraph{Robustness metrics.}
-Sensitivity to graph corruption and bootstrap support stability.
+\subsection{SBM Sweep}
+We also report a single-seed SBM sweep over $\lambda_2$ using the same method comparison set. The sweep is used to illustrate the recovery--smoothness tradeoff under increasing graph regularization.
 
 \section{Results}
 \label{sec:results}
 
 \paragraph{Overview.}
-We report synthetic results using shared evaluation metrics across all methods: union support F1, graph smoothness norm on the true graph, and a shared explained-variance measure computed from orthonormalized loadings. Shared explained variance is an evaluation metric and is not the training objective for any of the methods. We do not compare raw objective values across methods because they optimize different objectives. Results are presented for chain and SBM graphs across five seeds (0--4), and for a single-seed SBM sweep over $\lambda_2$. The comparison set includes PCA, A-ManPG, SparseNoGraph, and the Proposed method.
+We report synthetic results using shared evaluation metrics across all methods: union support F1, graph smoothness norm on the true graph, and a shared explained-variance measure computed from QR-orthonormalized loadings. Shared explained variance is an evaluation metric and is not the training objective for any of the methods. We do not compare raw objective values across methods because they optimize different objectives. Results are presented for chain and SBM graphs across five seeds (0--4), and for a single-seed SBM sweep over $\lambda_2$. The comparison set includes PCA, A-ManPG, SparseNoGraph, and the Proposed method.
 
 \subsection{Chain Robustness (Seeds 0--4)}
-Across seeds, PCA is consistently worst on support recovery. A-ManPG improves substantially over PCA but remains below the sparse baselines on mean support F1. SparseNoGraph achieves the highest mean support F1, while the Proposed method attains slightly lower F1 but achieves a clearly lower graph smoothness norm on the true chain graph. Shared explained variance is similar across the non-PCA methods and lower than PCA, as expected for sparse solutions. This pattern indicates that on chain graphs, graph regularization improves structural coherence while remaining competitive on recovery.
+Across seeds, PCA is consistently worst on support recovery. A-ManPG improves substantially over PCA but remains below the sparse baselines on mean support F1. SparseNoGraph achieves the highest mean support F1, while the Proposed method attains slightly lower F1 but achieves a clearly lower graph smoothness norm on the true chain graph. Shared explained variance is similar across the non-PCA methods and lower than PCA, as expected for sparse baselines. This pattern indicates that on chain graphs, graph regularization improves structural coherence while remaining competitive on recovery.
 \begin{table}[t]
 \centering
 \scriptsize
@@ -404,16 +362,6 @@ The main limitation of the current evidence is that it remains synthetic and foc
 \label{sec:conclusion}
 
 We present synthetic evidence that graph-regularized sparse orthogonal PCA improves structural coherence while inducing a topology-dependent tradeoff with support recovery. On chain graphs, the proposed method is competitive on recovery and yields smoother supports; on SBM graphs, stronger graph regularization improves smoothness but reduces recovery accuracy. These findings highlight the need for topology-aware $\lambda_2$ tuning and support a modest, defensible Paper-1 claim: graph regularization can improve structural coherence, but its effect on recovery depends on graph topology and regularization strength.
-
-\appendix
-
-\section{Proof Sketches and Deferred Arguments}
-\label{app:proofs}
-This appendix is a placeholder for proof details, technical lemmas, and auxiliary propositions.
-
-\section{Additional Experimental Details}
-\label{app:exp}
-This appendix is a placeholder for hyperparameter grids, implementation details, dataset preprocessing, and ablation tables.
 
 \fussy
 \bibliographystyle{plain}
