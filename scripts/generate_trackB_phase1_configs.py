@@ -67,7 +67,7 @@ def generate_phase1(
 
 
 def main() -> None:
-    seeds = [0, 1, 2]
+    seeds = list(range(20))
     lambda2_grid = [0.0, 0.05, 0.1, 0.2, 0.5]
     decoys = [
         ("low", 6, 1.5),
