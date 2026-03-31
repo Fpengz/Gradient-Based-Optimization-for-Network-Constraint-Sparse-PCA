@@ -7,7 +7,10 @@ from typing import Dict, Iterable, List
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUTS = ROOT / "outputs"
+OUTPUT_ROOTS = [
+    ROOT / "outputs",
+    ROOT / "results",
+]
 
 
 def _load_json(path: Path) -> Dict:
@@ -25,20 +28,23 @@ def _experiment_label(cfg: Dict, output_dir: str) -> str:
 
 
 def _iter_runs() -> Iterable[Dict]:
-    for metrics_path in OUTPUTS.rglob("metrics.json"):
-        run_dir = metrics_path.parent
-        artifacts_path = run_dir / "artifacts.json"
-        if not artifacts_path.exists():
+    for root in OUTPUT_ROOTS:
+        if not root.exists():
             continue
-        artifacts = _load_json(artifacts_path)
-        cfg = artifacts.get("config", {})
-        metrics = _load_json(metrics_path)
-        output_dir = cfg.get("output_dir", str(run_dir))
-        yield {
-            "cfg": cfg,
-            "metrics": metrics,
-            "output_dir": output_dir,
-        }
+        for metrics_path in root.rglob("metrics.json"):
+            run_dir = metrics_path.parent
+            artifacts_path = run_dir / "artifacts.json"
+            if not artifacts_path.exists():
+                continue
+            artifacts = _load_json(artifacts_path)
+            cfg = artifacts.get("config", {})
+            metrics = _load_json(metrics_path)
+            output_dir = cfg.get("output_dir", str(run_dir))
+            yield {
+                "cfg": cfg,
+                "metrics": metrics,
+                "output_dir": output_dir,
+            }
 
 
 def main() -> None:
@@ -57,6 +63,9 @@ def main() -> None:
                     "output_dir": output_dir,
                     "graph_family": cfg.get("graph_family"),
                     "support_type": cfg.get("support_type"),
+                    "track": cfg.get("track"),
+                    "phase": cfg.get("phase"),
+                    "decoy_intensity": cfg.get("decoy_intensity"),
                     "seed": cfg.get("seed"),
                     "lambda2": cfg.get("lambda2"),
                     "method": method,
