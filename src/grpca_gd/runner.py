@@ -220,6 +220,10 @@ def run(config_path: str) -> None:
                 orthonormalize(amanpg_B), Sigma_hat
             ),
         }
+        amanpg_union_mask = np.any(np.abs(amanpg_aligned) > 1e-8, axis=1)
+        amanpg_eval["support_connectivity_union"] = support_connectivity(
+            amanpg_union_mask, L
+        )
         metrics_out["A-ManPG"] = amanpg_eval
 
         solver_cfg = SolverConfig(
