@@ -41,3 +41,4 @@ multirun/
 papers/**/build/
 .worktrees/
 !results/reporting_template.md
+!paper/*.pdf
