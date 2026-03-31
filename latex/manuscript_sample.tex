@@ -297,7 +297,7 @@ We also report a single-seed SBM sweep over $\lambda_2$ using the same method co
 We report synthetic results using shared evaluation metrics across all methods: union support F1, graph smoothness norm on the true graph, and a shared explained-variance measure computed from QR-orthonormalized loadings. Shared explained variance is an evaluation metric and is not the training objective for any of the methods. We do not compare raw objective values across methods because they optimize different objectives. Results are presented for chain and SBM graphs across five seeds (0--4), and for a single-seed SBM sweep over $\lambda_2$. The comparison set includes PCA, A-ManPG, SparseNoGraph, and the Proposed method.
 
 \subsection{Chain Robustness (Seeds 0--4)}
-Across seeds, PCA is consistently worst on support recovery. A-ManPG improves substantially over PCA but remains below the sparse baselines on mean support F1. SparseNoGraph achieves the highest mean support F1, while the Proposed method attains slightly lower F1 but achieves a clearly lower graph smoothness norm on the true chain graph. Shared explained variance is similar across the non-PCA methods and lower than PCA, as expected for sparse baselines. This pattern indicates that on chain graphs, graph regularization improves structural coherence while remaining competitive on recovery.
+Across seeds, PCA is consistently worst on support recovery. A-ManPG improves substantially over PCA but remains below the sparse baselines on mean support F1. SparseNoGraph achieves the highest mean support F1, while the Proposed method attains slightly lower F1 but achieves a lower graph smoothness norm on the true chain graph. Shared explained variance is similar across the non-PCA methods and lower than PCA, as expected for sparse baselines. This pattern indicates that on chain graphs, graph regularization improves structural coherence while remaining competitive on recovery.
 \begin{table}[t]
 \centering
 \scriptsize
@@ -341,7 +341,7 @@ Proposed & 0.744 $\pm$ 0.051 & 15.764 $\pm$ 1.104 & 6.003 $\pm$ 0.384 \\
 \end{table}
 
 \subsection{SBM \texorpdfstring{$\lambda_2$}{lambda2} Sweep (Seed 2)}
-Sweeping $\lambda_2 \in \{0.0, 0.05, 0.1, 0.2, 0.5\}$ reveals a monotone smoothness--recovery tradeoff. Light graph regularization improves smoothness with minimal loss in support F1, while larger $\lambda_2$ values steadily decrease support F1 and increase support density. Shared explained variance declines moderately as $\lambda_2$ grows. This sweep indicates that $\lambda_2$ must be tuned to graph topology; values that are benign on chains can oversmooth on SBM.
+Sweeping $\lambda_2 \in \{0.0, 0.05, 0.1, 0.2, 0.5\}$ reveals an overall smoothness--recovery tradeoff. Light graph regularization improves smoothness with minimal loss in support F1, while larger $\lambda_2$ values steadily decrease support F1 and increase support density. Shared explained variance declines moderately as $\lambda_2$ grows. This sweep indicates that $\lambda_2$ must be tuned to graph topology; values that are benign on chains can oversmooth on SBM.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/sbm_lambda2_sweep_panel.png}
