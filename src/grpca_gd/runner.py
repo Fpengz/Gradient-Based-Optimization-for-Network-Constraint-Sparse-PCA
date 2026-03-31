@@ -186,6 +186,42 @@ def run(config_path: str) -> None:
 
         A0 = A_pca
         B0 = soft_threshold(A0, cfg["lambda1"] / max(cfg["rho"], 1e-8))
+        amanpg_cfg = AmanpgConfig(
+            lambda1=cfg["lambda1"],
+            eta_A=cfg["eta_A"],
+            max_iters=cfg["max_iters"],
+            tol_obj=cfg["tol_obj"],
+            tol_orth=cfg["tol_orth"],
+        )
+        amanpg_result = solve_amanpg(A0, Sigma_hat, amanpg_cfg)
+        amanpg_B = amanpg_result.A
+        amanpg_aligned, amanpg_perm, amanpg_signs = _alignment(
+            amanpg_result.A, amanpg_B, dataset.true_loadings
+        )
+        amanpg_support = support_metrics(amanpg_aligned, dataset.true_supports)
+        amanpg_eval = {
+            "method_name": "A-ManPG",
+            "objective_terms": objective_terms(
+                amanpg_result.A,
+                amanpg_B,
+                Sigma_hat,
+                L,
+                cfg["lambda1"],
+                0.0,
+                0.0,
+            ),
+            "sparsity_fraction": sparsity_fraction(amanpg_B),
+            "orthogonality_error": orthogonality_error(amanpg_result.A),
+            "laplacian_energy": laplacian_energy(amanpg_B, L),
+            "support_metrics": amanpg_support,
+            "graph_smoothness_raw_trueL": graph_smoothness_raw(amanpg_B, L),
+            "graph_smoothness_norm_trueL": graph_smoothness_norm(amanpg_B, L),
+            "shared_explained_variance": explained_variance(
+                orthonormalize(amanpg_B), Sigma_hat
+            ),
+        }
+        metrics_out["A-ManPG"] = amanpg_eval
+
         solver_cfg = SolverConfig(
             lambda1=cfg["lambda1"],
             lambda2=cfg["lambda2"],
@@ -279,6 +315,10 @@ def run(config_path: str) -> None:
             "B": result.B,
             "A_init": A0,
             "B_init": B0,
+            "amanpg_A": amanpg_result.A,
+            "amanpg_B": amanpg_B,
+            "amanpg_matching_perm": amanpg_perm,
+            "amanpg_matching_signs": amanpg_signs,
             "pca_A": A_pca,
             "pca_B": B_pca,
             "Sigma_true": dataset.Sigma_true,
@@ -290,6 +330,7 @@ def run(config_path: str) -> None:
             "matching_signs": signs,
             "pca_matching_perm": perm_pca,
             "pca_matching_signs": signs_pca,
+            **{f"amanpg_history_{k}": v for k, v in amanpg_result.history.items()},
             **{f"history_{k}": v for k, v in history_arrays.items()},
         }
 
@@ -316,6 +357,7 @@ def run(config_path: str) -> None:
 
     artifacts_meta = {
         "method_name": "Proposed",
+        "baseline_methods": ["PCA", "A-ManPG", "SparseNoGraph"],
         "status": status,
         "failure_reason": failure_reason,
         "manifest": manifest,
