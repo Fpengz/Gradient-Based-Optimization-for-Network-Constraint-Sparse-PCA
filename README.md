@@ -97,7 +97,7 @@ Compile **from the repo root** (not from inside `latex/`):
 
 ```bash
 pdflatex latex/manuscript_sample.tex
-(cd latex && bibtex manuscript_sample)
+BIBINPUTS=latex: bibtex manuscript_sample
 pdflatex latex/manuscript_sample.tex
 pdflatex latex/manuscript_sample.tex
 ```
