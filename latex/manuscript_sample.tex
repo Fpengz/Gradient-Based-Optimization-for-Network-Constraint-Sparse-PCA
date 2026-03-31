@@ -8,6 +8,7 @@
 \usepackage{mathtools}
 \usepackage{microtype}
 \usepackage{graphicx}
+\graphicspath{{figures/}{../figures/}}
 \usepackage{subcaption}
 \usepackage{booktabs}
 \usepackage{multirow}
@@ -344,7 +345,7 @@ Proposed & 0.744 $\pm$ 0.051 & 15.764 $\pm$ 1.104 & 6.003 $\pm$ 0.384 \\
 Sweeping $\lambda_2 \in \{0.0, 0.05, 0.1, 0.2, 0.5\}$ reveals an overall smoothness--recovery tradeoff. Light graph regularization improves smoothness with minimal loss in support F1, while larger $\lambda_2$ values steadily decrease support F1 and increase support density. Shared explained variance declines moderately as $\lambda_2$ grows. This sweep indicates that $\lambda_2$ must be tuned to graph topology; values that are benign on chains can oversmooth on SBM.
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/sbm_lambda2_sweep_panel.png}
+\includegraphics[width=\linewidth]{sbm_lambda2_sweep_panel.png}
 \caption{SBM lambda2 sweep (seed 2). Light regularization improves smoothness with limited recovery loss, while stronger regularization oversmooths and degrades support recovery.}
 \label{fig:sbm-lambda2-sweep}
 \end{figure}
