@@ -149,6 +149,8 @@ def run(config_path: str) -> None:
             snr=cfg["snr"],
             signal_eigs=cfg.get("signal_eigs"),
             seed=cfg["seed"],
+            decoy_count=int(cfg.get("decoy_count", 0)),
+            decoy_variance_factor=float(cfg.get("decoy_variance_factor", 0.0)),
         )
 
         Sigma_hat = dataset.Sigma_hat
