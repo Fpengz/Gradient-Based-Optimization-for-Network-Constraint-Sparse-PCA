@@ -11,22 +11,30 @@ def sparsity_fraction(B: np.ndarray, eps: float = 1e-8) -> float:
 
 
 def laplacian_energy(B: np.ndarray, L: np.ndarray) -> float:
-    return float(np.trace(B.T @ L @ B))
+    # Inputs are finite in pilot checks; guard against spurious BLAS warnings.
+    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+        return float(np.trace(B.T @ L @ B))
 
 
 def graph_smoothness_raw(B: np.ndarray, L_true: np.ndarray) -> float:
-    return float(np.trace(B.T @ L_true @ B))
+    # Inputs are finite in pilot checks; guard against spurious BLAS warnings.
+    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+        return float(np.trace(B.T @ L_true @ B))
 
 
 def graph_smoothness_norm(B: np.ndarray, L_true: np.ndarray) -> float:
     denom = float(np.trace(B.T @ B))
     if denom <= 0:
         return 0.0
-    return float(np.trace(B.T @ L_true @ B) / denom)
+    # Inputs are finite in pilot checks; guard against spurious BLAS warnings.
+    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+        return float(np.trace(B.T @ L_true @ B) / denom)
 
 
 def explained_variance(Q: np.ndarray, sigma_hat: np.ndarray) -> float:
-    return float(np.trace(Q.T @ sigma_hat @ Q))
+    # Inputs are finite in pilot checks; guard against spurious BLAS warnings.
+    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+        return float(np.trace(Q.T @ sigma_hat @ Q))
 
 
 def orthonormalize(B: np.ndarray) -> np.ndarray:

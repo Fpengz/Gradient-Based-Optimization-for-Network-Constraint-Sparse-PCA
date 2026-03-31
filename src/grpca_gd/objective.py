@@ -6,7 +6,9 @@ import numpy as np
 
 
 def negative_variance_term(A: np.ndarray, sigma_hat: np.ndarray) -> float:
-    return -float(np.trace(A.T @ sigma_hat @ A))
+    # Inputs are finite in pilot checks; guard against spurious BLAS warnings.
+    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+        return -float(np.trace(A.T @ sigma_hat @ A))
 
 
 def sparsity_penalty(B: np.ndarray, lambda1: float) -> float:
@@ -14,7 +16,9 @@ def sparsity_penalty(B: np.ndarray, lambda1: float) -> float:
 
 
 def graph_penalty(B: np.ndarray, L: np.ndarray, lambda2: float) -> float:
-    return float(lambda2 * np.trace(B.T @ L @ B))
+    # Inputs are finite in pilot checks; guard against spurious BLAS warnings.
+    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+        return float(lambda2 * np.trace(B.T @ L @ B))
 
 
 def coupling_penalty(A: np.ndarray, B: np.ndarray, rho: float) -> float:
