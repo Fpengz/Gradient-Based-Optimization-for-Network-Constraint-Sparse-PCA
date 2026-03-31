@@ -1,4 +1,4 @@
-# Reporting Template (Paper 1)
+# Reporting Template (Track A)
 
 ## Solver Convergence
 - Objective vs iteration
@@ -42,18 +42,18 @@ Chain graphs favor local smoothness; the Proposed method is the smoothest while 
 
 SBM graphs show a clearer recovery--smoothness tradeoff: Proposed is smoother, while SparseNoGraph and A-ManPG recover supports more accurately.
 
-## SBM lambda2 sweep (seed=2)
+## SBM lambda2 sweep (seeds 0--2)
 **Figure artifact:** `../figures/sbm_lambda2_sweep_panel.png`  
-This panel summarizes the SBM `lambda2` sweep for support F1, graph smoothness norm, and shared explained variance.
+This panel summarizes the SBM `lambda2` sweep (mean ± std) for support F1, graph smoothness norm, and shared explained variance, with A-ManPG as a horizontal reference line.
 
 Light graph regularization can improve smoothness with minimal recovery loss.
 Stronger graph regularization produces smoother but denser and less accurate supports on SBM.
 Operational takeaway: for SBM-like graphs, `lambda2` needs topology-sensitive tuning rather than chain-tuned defaults.
 
-| lambda2 | support_f1 | graph_smoothness_norm | shared_explained_variance |
-|---:|---:|---:|---:|
-| 0.00 | 0.983 | 18.339 | 6.467 |
-| 0.05 | 0.983 | 17.443 | 6.434 |
-| 0.10 | 0.829 | 16.978 | 6.372 |
-| 0.20 | 0.645 | 16.456 | 6.287 |
-| 0.50 | 0.531 | 15.952 | 6.185 |
+## Chain lambda2 sweep (seeds 0--2)
+**Figure artifact:** `../figures/chain_lambda2_sweep_panel.png`  
+This panel summarizes the chain `lambda2` sweep (mean ± std) for support F1, graph smoothness norm, and shared explained variance, with A-ManPG as a horizontal reference line.
+
+## Graph-aligned chain setting
+**Figure artifact:** `../figures/graph_aligned_lambda2_sweep_panel.png`  
+This panel summarizes the graph-aligned chain sweep (mean ± std) for support F1, smoothness norm, and largest connected-component ratio, showing the impact of moderate graph regularization on structural connectivity.

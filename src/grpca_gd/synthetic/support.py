@@ -25,6 +25,18 @@ def generate_supports(
 
         if support_type == "connected":
             idx = np.arange(start, start + support_size)
+        elif support_type == "connected_disjoint":
+            total = r * support_size
+            min_gap = 1
+            if p < total + (r + 1) * min_gap:
+                raise ValueError("p too small for disjoint connected supports")
+            gap = (p - total) // (r + 1)
+            gap = max(min_gap, gap)
+            used = total + (r + 1) * gap
+            slack = max(0, p - used)
+            offset = int(rng.integers(0, slack + 1)) if slack > 0 else 0
+            start = offset + gap + j * (support_size + gap)
+            idx = np.arange(start, start + support_size)
         elif support_type == "disconnected":
             s1 = support_size // 2
             s2 = support_size - s1
@@ -39,7 +51,9 @@ def generate_supports(
                 np.arange(start2, start2 + s2),
             ])
         else:
-            raise ValueError("support_type must be 'connected' or 'disconnected'")
+            raise ValueError(
+                "support_type must be 'connected', 'connected_disjoint', or 'disconnected'"
+            )
 
         supports.append(idx)
 

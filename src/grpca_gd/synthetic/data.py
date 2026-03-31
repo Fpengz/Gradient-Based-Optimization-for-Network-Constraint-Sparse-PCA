@@ -80,10 +80,23 @@ def generate_dataset(
     snr: float,
     signal_eigs: Optional[List[float]],
     seed: int,
+    decoy_count: int = 0,
+    decoy_variance_factor: float = 0.0,
 ) -> SyntheticDataset:
     rng = np.random.default_rng(seed)
     U, supports = build_loadings(p, r, support_size, support_type, rng)
     Sigma_true, Lambda, sigma2 = build_covariance(U, signal_eigs, snr)
+    decoy_indices: List[int] = []
+    if decoy_count > 0 and decoy_variance_factor > 0:
+        true_mask = np.zeros(p, dtype=bool)
+        for idx in supports:
+            true_mask[idx] = True
+        candidates = np.where(~true_mask)[0]
+        if decoy_count > len(candidates):
+            raise ValueError("decoy_count exceeds available non-support features")
+        decoy_indices = rng.choice(candidates, size=decoy_count, replace=False).tolist()
+        extra_var = float(decoy_variance_factor) * sigma2
+        Sigma_true[decoy_indices, decoy_indices] += extra_var
     X = sample_data(Sigma_true, n, rng)
     Sigma_hat = (X.T @ X) / n
     metadata = {
@@ -93,6 +106,9 @@ def generate_dataset(
         "snr": snr,
         "signal_eigs": list(np.diag(Lambda)),
         "sigma2": sigma2,
+        "decoy_count": decoy_count,
+        "decoy_variance_factor": decoy_variance_factor,
+        "decoy_indices": decoy_indices,
     }
     return SyntheticDataset(
         X=X,
