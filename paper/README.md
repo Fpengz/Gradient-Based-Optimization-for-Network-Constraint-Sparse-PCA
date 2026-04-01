@@ -1,4 +1,4 @@
-# Paper Snapshot (Track-A)
+# Paper Snapshots and Active Branches
 
 **Frozen version:** `paper1-trackA-v2`
 
@@ -37,3 +37,12 @@ Tag: `paper1-phase1.5-submission-v1`
 Branch: `paper1-phase1.5-submission`
 
 This version is frozen and should not be modified.
+
+## Phase 2 (Active)
+
+This is the active Phase 2 branch with real-data sanity check and grid topology additions.
+
+Tag: (none; active development)  
+Branch: `codex/paper1-phase2`
+
+Do not edit frozen snapshots; make Phase 2 changes only on the active branch.
