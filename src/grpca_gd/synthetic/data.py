@@ -25,8 +25,12 @@ def build_loadings(
     support_size: int,
     support_type: str,
     rng: np.random.Generator,
+    adjacency: np.ndarray | None = None,
+    metadata: Dict[str, object] | None = None,
 ) -> Tuple[np.ndarray, List[np.ndarray]]:
-    supports = generate_supports(p, r, support_size, support_type, rng)
+    supports = generate_supports(
+        p, r, support_size, support_type, rng, adjacency=adjacency, metadata=metadata
+    )
     U = np.zeros((p, r), dtype=float)
     for j, idx in enumerate(supports):
         U[idx, j] = rng.normal(size=len(idx))
@@ -82,11 +86,15 @@ def generate_dataset(
     snr: float,
     signal_eigs: Optional[List[float]],
     seed: int,
+    adjacency: np.ndarray | None = None,
+    graph_metadata: Dict[str, object] | None = None,
     decoy_count: int = 0,
     decoy_variance_factor: float = 0.0,
 ) -> SyntheticDataset:
     rng = np.random.default_rng(seed)
-    U, supports = build_loadings(p, r, support_size, support_type, rng)
+    U, supports = build_loadings(
+        p, r, support_size, support_type, rng, adjacency=adjacency, metadata=graph_metadata
+    )
     Sigma_true, Lambda, sigma2 = build_covariance(U, signal_eigs, snr)
     decoy_indices: List[int] = []
     if decoy_count > 0 and decoy_variance_factor > 0:
