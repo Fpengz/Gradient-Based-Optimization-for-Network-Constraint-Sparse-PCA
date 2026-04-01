@@ -56,7 +56,7 @@ def _load_json(path: Path) -> Dict:
 
 def _iter_runs(results_root: Path) -> Iterable[Dict[str, object]]:
     if not results_root.exists():
-        return
+        return iter(())
 
     for metrics_path in results_root.rglob("metrics.json"):
         run_dir = metrics_path.parent
