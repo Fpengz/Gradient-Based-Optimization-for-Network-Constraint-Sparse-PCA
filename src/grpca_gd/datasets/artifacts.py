@@ -40,16 +40,16 @@ def save_artifact(artifact: DatasetArtifact, out_dir: Path) -> None:
 
 def load_artifact(out_dir: Path) -> DatasetArtifact:
     payload = json.loads((out_dir / "artifact.json").read_text(encoding="utf-8"))
-    arrays = np.load(out_dir / "data.npz")
-    return DatasetArtifact(
-        artifact_id=payload["artifact_id"],
-        artifact_version=payload["artifact_version"],
-        dataset=payload["dataset"],
-        graph_family=payload["graph_family"],
-        data_source=payload["data_source"],
-        prep_config_hash=payload["prep_config_hash"],
-        eval_protocol_id=payload["eval_protocol_id"],
-        X=arrays["X"],
-        L=arrays["L"],
-        metadata=payload.get("metadata", {}),
-    )
+    with np.load(out_dir / "data.npz") as arrays:
+        return DatasetArtifact(
+            artifact_id=payload["artifact_id"],
+            artifact_version=payload["artifact_version"],
+            dataset=payload["dataset"],
+            graph_family=payload["graph_family"],
+            data_source=payload["data_source"],
+            prep_config_hash=payload["prep_config_hash"],
+            eval_protocol_id=payload["eval_protocol_id"],
+            X=arrays["X"],
+            L=arrays["L"],
+            metadata=payload.get("metadata", {}),
+        )
