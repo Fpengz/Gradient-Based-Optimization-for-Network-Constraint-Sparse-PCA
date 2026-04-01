@@ -66,7 +66,7 @@
 % Abstract
 % =========================
 \begin{abstract}
-We study sparse, graph-smooth, explicitly orthogonal multi-component PCA through a split-variable formulation that couples an orthogonal loading matrix with a sparse graph-regularized proxy. We propose a concrete alternating solver consisting of a Stiefel manifold update for the orthogonal factor and a proximal-gradient update for the sparse graph-smooth factor. We evaluate the method on synthetic graph families using shared evaluation metrics (support recovery, graph smoothness on the true graph, and shared explained variance). In our synthetic experiments, graph regularization yields smoother solutions on the true graph, while its effect on support recovery is topology-dependent: on chain graphs the method is competitive on recovery and smoother on the true graph, whereas on SBM graphs stronger regularization induces a recovery--smoothness tradeoff and light regularization can improve smoothness with limited recovery loss. We also include a graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, where a narrow low-$\\lambda_2$ band ($\\lambda_2\\in[0.05,0.10]$) yields strong smoothness gains with no clear support-F1 penalty relative to SparseNoGraph and exceeds A-ManPG across metrics in the high-decoy regime. The study is synthetic-first and limited to chain and SBM topologies; broader theoretical guarantees and real-data validation remain future work.
+We study sparse, graph-smooth, explicitly orthogonal multi-component PCA through a split-variable formulation that couples an orthogonal loading matrix with a sparse graph-regularized proxy. We propose a concrete alternating solver consisting of a Stiefel manifold update for the orthogonal factor and a proximal-gradient update for the sparse graph-smooth factor. We evaluate the method on synthetic graph families using shared evaluation metrics (support recovery, graph smoothness on the true graph, and shared explained variance). In our synthetic experiments, graph regularization yields smoother solutions on the true graph, while its effect on support recovery is topology-dependent: on chain graphs the method is competitive on recovery and smoother on the true graph, whereas on SBM graphs stronger regularization induces a recovery--smoothness tradeoff and light regularization can improve smoothness with limited recovery loss. We also include a graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, where a low-to-moderate $\\lambda_2$ regime (approximately $0.04$--$0.11$) yields strong smoothness gains with no clear support-F1 degradation relative to SparseNoGraph, while exceeding A-ManPG across recovery, smoothness, and connectivity in the high-decoy regime. These benefits are tuning-sensitive, and stronger regularization eventually oversmooths and reduces recovery. The study is synthetic-first and limited to chain and SBM topologies; broader theoretical guarantees and real-data validation remain future work.
 \end{abstract}
 
 \section{Introduction}
@@ -93,7 +93,7 @@ The main contributions of this work are as follows.
 \begin{itemize}[leftmargin=*]
     \item Graph regularization consistently reduces the chosen graph-smoothness metric on the true graph, while its recovery impact depends on topology.
     \item On chain graphs, recovery remains competitive with sparse baselines while smoothness improves; on SBM graphs, stronger regularization induces a clearer recovery--smoothness tradeoff.
-    \item In a graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, a narrow low-$\lambda_2$ band yields strong smoothness gains with no clear support-F1 penalty relative to SparseNoGraph and exceeds A-ManPG across metrics in the high-decoy regime.
+    \item In a graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, a low-to-moderate $\\lambda_2$ regime (roughly $0.04$--$0.11$) yields strong smoothness gains with no clear support-F1 degradation relative to SparseNoGraph and exceeds A-ManPG across metrics in the high-decoy regime.
     \item We provide a concrete split-variable solver that combines explicit orthogonality, sparsity, and graph smoothness within a single executable framework.
 \end{itemize}
 
@@ -359,11 +359,13 @@ Proposed & 0.744 $\pm$ 0.051 & 15.764 $\pm$ 1.104 & 6.003 $\pm$ 0.384 \\
 \end{table}
 
 \subsection{Graph-Aligned Chain Setting (Disjoint Supports + Scattered Decoys)}
-Figure~\ref{fig:graph-aligned-high} summarizes the high-decoy graph-aligned setting. A narrow low-$\lambda_2$ band around $\lambda_2 \in [0.05, 0.10]$ yields strong smoothness reductions relative to SparseNoGraph with no clear support-F1 penalty, while the Proposed method exceeds A-ManPG on recovery, smoothness, and connectivity. Table~\ref{tab:graph-aligned-summary} reports a representative $\lambda_2=0.05$ setting (20 seeds). Figure~\ref{fig:graph-aligned-medium} provides the medium-decoy supporting view, which follows a similar but weaker pattern.
+Figure~\ref{fig:graph-aligned-high} summarizes the high-decoy graph-aligned setting. A low-to-moderate $\\lambda_2$ regime (approximately $0.04$--$0.11$) yields strong smoothness reductions relative to SparseNoGraph with no clear support-F1 degradation, while the Proposed method exceeds A-ManPG on recovery, smoothness, and connectivity. This regime is gradual rather than sharply localized: edge comparisons at $\\lambda_2\\in\\{0.04,0.05,0.10,0.11,0.12\\}$ show support-F1 confidence intervals that continue to include zero through $\\lambda_2=0.12$, whereas smoothness gains increase monotonically across the sweep. Table~\ref{tab:graph-aligned-summary} reports a representative $\\lambda_2=0.05$ setting (20 seeds). Figure~\ref{fig:graph-aligned-medium} provides the medium-decoy supporting view, which follows a similar but weaker pattern.
+\paragraph{Adjusted comparisons and component checks.}
+Per-$\\lambda_2$ Holm/BH-adjusted comparisons show statistically significant smoothness gains across the sweep, while no adjusted test detects a support-F1 difference versus SparseNoGraph in the low-to-moderate regime. Component-wise diagnostics do not indicate hidden degradation inside the operating regime; worst-component F1 does not collapse, and at $\\lambda_2=0.04$--$0.05$ it is slightly improved. Coupling-gap diagnostics remain stable across representative $\\lambda_2$ values, with larger final gaps under stronger graph regularization but no instability across the useful regime.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{high_decoy_band.png}
-\caption{High-decoy graph-aligned setting (20 seeds, mean $\pm$ SEM). In the high-decoy regime, the proposed method shows a narrow low-$\lambda_2$ band ($[0.05, 0.10]$, shaded) with strong reductions in graph smoothness norm relative to SparseNoGraph and no clear support-F1 penalty. Across the same band, the proposed method exceeds A-ManPG on support F1, smoothness, and connectivity. Larger $\lambda_2$ values oversmooth and eventually reduce recovery.}
+\caption{High-decoy graph-aligned setting (20 seeds, mean $\pm$ SEM). In the high-decoy regime, the proposed method shows a low-to-moderate $\\lambda_2$ regime (approximately $0.04$--$0.11$, shaded) with strong reductions in graph smoothness norm relative to SparseNoGraph and no clear support-F1 degradation. Across the same regime, the proposed method exceeds A-ManPG on support F1, smoothness, and connectivity. Larger $\\lambda_2$ values oversmooth and eventually reduce recovery.}
 \label{fig:graph-aligned-high}
 \end{figure}
 
@@ -390,7 +392,7 @@ Proposed & 0.933 $\pm$ 0.028 & 1.910 $\pm$ 0.379 & 0.343 $\pm$ 0.034 \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{medium_decoy_band.png}
-\caption{Medium-decoy graph-aligned setting (20 seeds, mean $\pm$ SEM). The medium-decoy regime shows a similar but weaker pattern: low-to-moderate graph regularization improves smoothness while keeping support recovery near the sparse non-graph baseline over a narrow $\lambda_2$ range. The benefit is more modest than in the high-decoy setting, indicating that the usefulness of graph regularization depends on distractor strength.}
+\caption{Medium-decoy graph-aligned setting (20 seeds, mean $\pm$ SEM). The medium-decoy regime shows a similar but weaker pattern: low-to-moderate graph regularization improves smoothness while keeping support recovery near the sparse non-graph baseline over a tuning-sensitive $\\lambda_2$ range. The benefit is more modest than in the high-decoy setting, indicating that the usefulness of graph regularization depends on distractor strength.}
 \label{fig:graph-aligned-medium}
 \end{figure}
 
@@ -413,7 +415,7 @@ Sweeping $\lambda_2 \in \{0.0, 0.05, 0.1, 0.2, 0.5\}$ across seeds (0--2) reveal
 \section{Discussion and Limitations}
 \label{sec:discussion}
 
-These experiments establish a focused empirical message: in our synthetic experiments, graph regularization yields smoother solutions on the true graph for both chain and SBM settings, but its effect on support recovery is topology-dependent. On chain graphs, the proposed method remains competitive on recovery while producing smoother supports, consistent with the intuition that chain structure aligns well with Laplacian smoothness. On SBM graphs, the graph prior enforces smoother structure at the cost of recovery accuracy, yielding a stable tradeoff rather than a contradiction. In the graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, a narrow low-$\lambda_2$ band ($\lambda_2\in[0.05,0.10]$) yields strong smoothness gains with no clear support-F1 penalty relative to SparseNoGraph while exceeding A-ManPG across metrics in the high-decoy regime.
+These experiments establish a focused empirical message: in our synthetic experiments, graph regularization yields smoother solutions on the true graph for both chain and SBM settings, but its effect on support recovery is topology-dependent. On chain graphs, the proposed method remains competitive on recovery while producing smoother supports, consistent with the intuition that chain structure aligns well with Laplacian smoothness. On SBM graphs, the graph prior enforces smoother structure at the cost of recovery accuracy, yielding a stable tradeoff rather than a contradiction. In the graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, a low-to-moderate $\\lambda_2$ regime (approximately $0.04$--$0.11$) yields strong smoothness gains with no clear support-F1 degradation relative to SparseNoGraph while exceeding A-ManPG across metrics in the high-decoy regime.
 
 The chain setting aligns naturally with local smoothness, whereas the SBM setting emphasizes block/community structure; as a result, the same smoothness penalty can act as a mild regularizer in one topology and as an oversmoothing force in another. The $\lambda_2$ sweep on SBM makes this explicit: mild regularization yields smoother solutions with limited recovery loss, whereas stronger regularization oversmooths and reduces recovery. These observations imply that $\lambda_2$ must be tuned with respect to graph topology rather than assumed to be universally beneficial.
 
@@ -422,16 +424,27 @@ The main limitation of the current evidence is that it remains synthetic and foc
 \section{Conclusion}
 \label{sec:conclusion}
 
-We present synthetic evidence that graph-regularized sparse orthogonal PCA improves structural coherence while inducing a topology-dependent tradeoff with support recovery. On chain graphs, the proposed method is competitive on recovery and yields smoother supports; on SBM graphs, stronger graph regularization improves smoothness but reduces recovery accuracy. In a graph-aligned chain setting with disjoint contiguous supports and scattered decoys, a narrow low-$\lambda_2$ band ($\lambda_2\in[0.05,0.10]$) yields strong smoothness gains with no clear support-F1 penalty relative to SparseNoGraph while exceeding A-ManPG across metrics in the high-decoy regime. These findings highlight the need for topology-aware, tuning-sensitive $\lambda_2$ selection and support a modest, defensible claim: graph regularization improves structural coherence, and its recovery impact depends on topology and regularization strength.
+We present synthetic evidence that graph-regularized sparse orthogonal PCA improves structural coherence while inducing a topology-dependent tradeoff with support recovery. On chain graphs, the proposed method is competitive on recovery and yields smoother supports; on SBM graphs, stronger graph regularization improves smoothness but reduces recovery accuracy. In a graph-aligned chain setting with disjoint contiguous supports and scattered decoys, a low-to-moderate $\\lambda_2$ regime (approximately $0.04$--$0.11$) yields strong smoothness gains with no clear support-F1 degradation relative to SparseNoGraph while exceeding A-ManPG across metrics in the high-decoy regime. These findings highlight the need for topology-aware, tuning-sensitive $\\lambda_2$ selection and support a modest, defensible claim: graph regularization improves structural coherence, and its recovery impact depends on topology and regularization strength.
 
 \appendix
+\section{Phase 1.5 Interpretation Summary}
+\label{sec:phase15-interpretation}
+
+We provide additional diagnostics for the graph-aligned high-decoy setting to support the low-to-moderate $\\lambda_2$ regime claim.
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Per-$\\lambda_2$ inference (Holm/BH):} Adjusted tests show statistically significant improvements in normalized graph smoothness for all $\\lambda_2$, while no adjusted comparison detects a support-F1 difference versus SparseNoGraph within the low-to-moderate regime. (See \texttt{results/trackB/phase1\_5/phase15\_per\_lambda\_holm\_bh.csv}.)
+    \item \textbf{Band-edge diagnostics:} Local comparisons at $\\lambda_2\\in\\{0.04, 0.05, 0.10, 0.11, 0.12\\}$ indicate a gradual transition: confidence intervals for $\\Delta$F1 include zero through $\\lambda_2\\approx 0.12$, while smoothness gains increase monotonically. (See \texttt{results/trackB/phase1\_5/phase15\_band\_edge\_summary.csv}.)
+    \item \textbf{Component-level checks:} Component-wise metrics do not indicate hidden degradation within the regime; worst-component F1 does not collapse and is slightly improved at $\\lambda_2=0.04$--$0.05$. (See \texttt{results/trackB/phase1\_5/phase15\_component\_summary.csv}.)
+    \item \textbf{Solver diagnostics:} Coupling-gap traces remain stable across representative $\\lambda_2$ values; larger final gaps appear under stronger regularization without instability in the useful regime.
+\end{itemize}
+
 \section{Supplementary Figures}
 \label{sec:appendix}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{diff_summary.png}
-\caption{Difference summary relative to SparseNoGraph (20 seeds, mean $\pm$ SEM). Proposed minus SparseNoGraph across decoy intensities. In the high-decoy setting, a narrow low-$\lambda_2$ region yields strong smoothness gains with no clear F1 penalty; outside this region, larger $\lambda_2$ values reduce recovery. Medium-decoy behavior is directionally similar but weaker.}
+\caption{Difference summary relative to SparseNoGraph (20 seeds, mean $\pm$ SEM). Proposed minus SparseNoGraph across decoy intensities. In the high-decoy setting, a low-to-moderate $\\lambda_2$ regime yields strong smoothness gains with no clear F1 degradation; outside this regime, larger $\\lambda_2$ values reduce recovery. Medium-decoy behavior is directionally similar but weaker.}
 \label{fig:graph-aligned-diff}
 \end{figure}
 
