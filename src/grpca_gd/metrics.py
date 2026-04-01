@@ -10,6 +10,10 @@ def sparsity_fraction(B: np.ndarray, eps: float = 1e-8) -> float:
     return float(np.mean(np.abs(B) > eps))
 
 
+def nnz_loadings(B: np.ndarray, eps: float = 1e-8) -> int:
+    return int(np.sum(np.abs(B) > eps))
+
+
 def laplacian_energy(B: np.ndarray, L: np.ndarray) -> float:
     return float(np.trace(B.T @ L @ B))
 
