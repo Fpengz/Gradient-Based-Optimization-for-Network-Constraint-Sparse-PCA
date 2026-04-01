@@ -38,14 +38,17 @@ def rewire_edges(W: np.ndarray, frac: float, rng: np.random.Generator) -> np.nda
 
     for idx in np.atleast_1d(remove):
         i, j = edge_idx[int(idx)]
+        weight = W2[i, j]
         W2[i, j] = 0.0
         W2[j, i] = 0.0
         if not available:
+            W2[i, j] = weight
+            W2[j, i] = weight
             continue
         pick = int(rng.integers(0, len(available)))
         a, b = available.pop(pick)
-        W2[a, b] = 1.0
-        W2[b, a] = 1.0
+        W2[a, b] = weight
+        W2[b, a] = weight
     return W2
 
 
