@@ -53,7 +53,7 @@
 % =========================
 % Title
 % =========================
-\title{\texorpdfstring{Graph-Smooth Sparse Orthogonal PCA via Alternating Manifold and Graph-Coupled Proximal Updates}{Graph-Smooth Sparse Orthogonal PCA via Alternating Manifold and Graph-Coupled Proximal Updates}}
+\title{\texorpdfstring{When Graph Regularization Helps (and Hurts): Topology-Dependent Regimes in Sparse PCA}{When Graph Regularization Helps (and Hurts): Topology-Dependent Regimes in Sparse PCA}}
 \author{Wang Zhoufu}
 \date{}
 
@@ -66,7 +66,7 @@
 % Abstract
 % =========================
 \begin{abstract}
-We study sparse, graph-smooth, explicitly orthogonal multi-component PCA through a split-variable formulation that couples an orthogonal loading matrix with a sparse graph-regularized proxy. We propose a concrete alternating solver consisting of a Stiefel manifold update for the orthogonal factor and a proximal-gradient update for the sparse graph-smooth factor. We evaluate the method on synthetic graph families using shared evaluation metrics (support recovery, graph smoothness on the true graph, and shared explained variance). In our synthetic experiments, graph regularization yields smoother solutions on the true graph, while its effect on support recovery is topology-dependent: on chain graphs the method is competitive on recovery and smoother on the true graph, whereas on SBM graphs stronger regularization induces a recovery–smoothness tradeoff and light regularization can improve smoothness with limited recovery loss. We also include a graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, where moderate graph regularization preserves recovery while improving structural connectivity and smoothness. The study is synthetic-first and limited to chain and SBM topologies; broader theoretical guarantees and real-data validation remain future work.
+We study sparse, graph-smooth, explicitly orthogonal multi-component PCA through a split-variable formulation that couples an orthogonal loading matrix with a sparse graph-regularized proxy. We propose a concrete alternating solver consisting of a Stiefel manifold update for the orthogonal factor and a proximal-gradient update for the sparse graph-smooth factor. We evaluate the method on synthetic chain and grid graphs under controlled graph misspecification, reporting support recovery, graph smoothness on the true graph, and shared explained variance. The results support a regime-based view: at low $\lambda_2$ the method is robust to misspecification across topologies, while at higher $\lambda_2$ misspecification effects depend on topology, with fragile chain graphs degrading under rewiring and redundant grid graphs remaining largely invariant. Empirically, moderate $\lambda_2$ yields favorable variance--smoothness tradeoffs before stronger regularization leads to diminishing returns. We therefore position our contribution as a regime-level characterization of when graph regularization is reliable under misspecification, rather than as an across-the-board performance improvement.
 \end{abstract}
 
 \section{Introduction}
@@ -86,14 +86,14 @@ This paper studies that question. We consider a formulation that combines three 
 
 Concretely, we introduce a graph-smooth sparse orthogonal PCA formulation in which orthogonality is handled through a Stiefel-constrained variable and structured sparse estimation is handled through a graph-regularized Euclidean variable coupled by a quadratic penalty. This split allows us to separate the geometry of orthogonality from the graph-coupled sparsity structure, while still optimizing the two jointly. The resulting viewpoint is particularly attractive in settings where interpretability is not just a matter of selecting a few variables, but of selecting variables whose pattern is coherent with known domain structure.
 
-Our study is guided by two central questions. First, when does feature-graph regularization preserve recovery while improving structural coherence of sparse components? Second, what tradeoff does graph regularization induce between explained variance, graph consistency, and computational cost? These questions are important because graph-based regularization can help when the prior graph is informative, but may oversmooth the loadings or reduce variance capture when the graph is misspecified. Accordingly, the paper emphasizes not only model design and optimization, but also the empirical circumstances under which graph priors are beneficial.
+Our study is guided by two central questions. First, when does feature-graph regularization preserve recovery while improving structural coherence of sparse components? Second, what tradeoff does graph regularization induce between explained variance, graph consistency, and computational cost? These questions are important because graph-based regularization can help when the prior graph is informative, but may oversmooth the loadings or reduce variance capture when the graph is misspecified. Accordingly, the paper emphasizes not only model design and optimization, but also the empirical circumstances under which graph priors are beneficial, revealing a phase diagram over regularization strength and corruption level.
 
 \paragraph{Contributions.}
 The main contributions of this work are as follows.
 \begin{itemize}[leftmargin=*]
-    \item Graph regularization consistently reduces the chosen graph-smoothness metric on the true graph, while its recovery impact depends on topology.
-    \item On chain graphs, recovery remains competitive with sparse baselines while smoothness improves; on SBM graphs, stronger regularization induces a clearer recovery--smoothness tradeoff.
-    \item In a graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, moderate regularization preserves recovery while improving support connectivity and smoothness.
+    \item We study graph-regularized sparse orthogonal PCA under controlled misspecification and show that the effect of graph regularization is regime-dependent in $\lambda_2$.
+    \item On chain graphs, stronger regularization amplifies misspecification effects, with rewiring more harmful than edge deletion; on grid graphs, performance is near-invariant under the same perturbations, indicating that robustness to misspecification is topology-dependent.
+    \item We identify an \emph{illusory smoothness} phenomenon, where graph misspecification can yield smoother solutions under the imposed prior without improving alignment with the true graph.
     \item We provide a concrete split-variable solver that combines explicit orthogonality, sparsity, and graph smoothness within a single executable framework.
 \end{itemize}
 
@@ -278,144 +278,136 @@ The outer loop stops when any of the following is satisfied (defaults used in al
 
 This section is intentionally descriptive rather than a proof development: we do not provide a formal convergence proof here, and formal analysis is out of scope for this manuscript.
 
-\section{Experimental Setup}
+\section{Experiments}
 \label{sec:experiments}
 
-We evaluate only the executed synthetic study. The comparison set is limited to PCA, A-ManPG, SparseNoGraph, and the Proposed method. SparseNoGraph is the in-family ablation with $\lambda_2=0$, while A-ManPG is the minimal external sparse orthogonal baseline without graph coupling. The graph families are chain and SBM. Main robustness results use seeds $0$--$4$, while sweep experiments and the graph-aligned setting use seeds $0$--$2$. Shared evaluation metrics only are reported: support recovery, graph smoothness on the true graph, shared explained variance, and support connectivity.
-
-\paragraph{Metric mapping and definitions.}
-Support metrics (precision/recall/F1 on the union and per component) are computed on $B$ after component matching to the true loadings; we use a Hungarian matching and sign correction before thresholding. Graph smoothness is reported as the normalized Laplacian energy
-\[
-\mathrm{Smoothness}(B;L) = \frac{\tr(B^\top L B)}{\tr(B^\top B)},
-\]
-computed on the true graph Laplacian. Shared explained variance is computed on an orthonormalized loading matrix: for Proposed and SparseNoGraph we use $Q=\mathrm{qr}(B)$, for A-ManPG we use $Q=\mathrm{qr}(A)$, and for PCA we use the top-$r$ eigenvectors of $\Sigmahat$. Support connectivity is computed on the union support mask (entries of $B$ exceeding $10^{-8}$) and reported as the number of connected components and the largest-component ratio.
-
-\paragraph{A-ManPG settings.}
-We use the public A-ManPG baseline with step size $\eta_A=0.05$, maximum iterations $200$, and tolerances $\text{tol}_{\mathrm{obj}}=10^{-6}$ and $\text{tol}_{\mathrm{orth}}=10^{-6}$, initialized from the PCA solution.
-
-\subsection{Main Runs}
-The main runs use the following hyperparameters unless otherwise stated:
-\begin{itemize}[leftmargin=*]
-    \item $\lambda_1=0.1$,
-    \item $\lambda_2=0.1$,
-    \item $\rho=5.0$,
-    \item $\eta_A=0.05$.
-\end{itemize}
-
-\subsection{Graph-Aligned Chain Setting}
-To test when the graph prior is genuinely helpful, we introduce a graph-aligned chain regime. Each component has a disjoint contiguous support block, evenly spaced along the chain with clear gaps, and we add scattered high-variance decoy features (20 non-support nodes with variance inflated by a factor of 2 relative to $\sigma^2$). This construction creates a setting where graph-unaware sparsity can be drawn toward isolated high-variance nodes, while graph regularization should favor coherent contiguous supports.
-
-\subsection{Multi-Seed \texorpdfstring{$\lambda_2$}{lambda2} Sweeps}
-We report multi-seed sweeps over $\lambda_2 \in \{0.0, 0.05, 0.1, 0.2, 0.5\}$ for SBM (mandatory) and for chain (recommended), using seeds $0$--$2$. We plot mean curves with uncertainty bands and overlay A-ManPG as a horizontal reference line (mean across the same seed set).
-
-\section{Results}
-\label{sec:results}
-
 \paragraph{Overview.}
-We report synthetic results using shared evaluation metrics across all methods: union support F1, graph smoothness norm on the true graph, shared explained variance (after QR orthonormalization), and a support-connectivity diagnostic (largest connected-component ratio). Shared explained variance is an evaluation metric and is not the training objective for any method. We do not compare raw objective values across methods because they optimize different objectives. Results are presented for chain and SBM graphs across five seeds (0--4), and for multi-seed $\lambda_2$ sweeps (seeds 0--2). The comparison set includes PCA, A-ManPG, SparseNoGraph, and the Proposed method.
+We map when graph regularization helps versus hurts by varying regularization strength and topology under controlled misspecification. We focus on chain and grid graphs with a fixed $\lambda_2$ sweep to probe the low-to-moderate regime. The goal is regime characterization, not absolute performance gains.
 
-\subsection{Chain Robustness (Seeds 0--4)}
-Across seeds, PCA is consistently worst on support recovery. A-ManPG improves substantially over PCA but remains below the sparse baselines on mean support F1. SparseNoGraph achieves the highest mean support F1, while the Proposed method attains slightly lower F1 but achieves a lower graph smoothness norm on the true chain graph. Shared explained variance is similar across the non-PCA methods and lower than PCA, as expected for sparse baselines. This pattern indicates that on chain graphs, graph regularization improves structural coherence while remaining competitive on recovery.
-\begin{table}[t]
-\centering
-\scriptsize
-\setlength{\tabcolsep}{3pt}
-\caption{Chain robustness (seeds 0--4). Mean $\pm$ std for shared evaluation metrics.}
-\label{tab:chain-summary}
-\resizebox{\linewidth}{!}{%
-\begin{tabular}{lccc}
-\toprule
-Method & Support F1 & Smoothness (norm) & Shared explained var \\
-\midrule
-PCA & 0.261 $\pm$ 0.000 & 2.099 $\pm$ 0.484 & 6.225 $\pm$ 0.406 \\
-A-ManPG & 0.914 $\pm$ 0.078 & 2.111 $\pm$ 0.483 & 6.122 $\pm$ 0.408 \\
-SparseNoGraph & 0.950 $\pm$ 0.033 & 2.118 $\pm$ 0.476 & 6.092 $\pm$ 0.413 \\
-Proposed & 0.927 $\pm$ 0.019 & 1.871 $\pm$ 0.465 & 6.059 $\pm$ 0.415 \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
+\paragraph{Experimental setup.}
+We evaluate chain and grid graph families only for the corruption and topology experiments; SBM is used only for compatibility and multi-component validation. Graph corruption is applied to the \emph{prior} graph used by the method; synthetic data and true supports are generated from the clean graph, so the study measures misspecification rather than altered ground truth. We consider two corruption types---edge deletion and random rewiring---with a fixed corruption level $\alpha=0.2$ (fraction of $|E|$). We sweep $\lambda_2 \in \{0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0\}$ with seeds $\{0,1,2\}$ (3 seeds for consistency checks, not statistical claims). Metrics reported are support recovery (F1), graph smoothness on the true graph, and shared explained variance. Baselines include PCA, A-ManPG, SparseNoGraph ($\lambda_2=0$), and the Proposed method. All methods are implemented in NumPy.
 
-\subsection{SBM Robustness (Seeds 0--4)}
-On SBM graphs, PCA again performs worst on support recovery. A-ManPG again improves over PCA but does not match the sparse baselines on support recovery. SparseNoGraph attains substantially higher support F1 than the Proposed method, while the Proposed method is consistently smoother on the true SBM graph (lower normalized graph smoothness). Shared explained variance remains comparable across the sparse methods. These results show a stable recovery--smoothness tradeoff on SBM: stronger graph regularization improves structural smoothness but can reduce recovery accuracy.
-\begin{table}[t]
-\centering
-\scriptsize
-\setlength{\tabcolsep}{3pt}
-\caption{SBM robustness (seeds 0--4). Mean $\pm$ std for shared evaluation metrics.}
-\label{tab:sbm-summary}
-\resizebox{\linewidth}{!}{%
-\begin{tabular}{lccc}
-\toprule
-Method & Support F1 & Smoothness (norm) & Shared explained var \\
-\midrule
-PCA & 0.261 $\pm$ 0.000 & 17.085 $\pm$ 0.974 & 6.225 $\pm$ 0.406 \\
-A-ManPG & 0.914 $\pm$ 0.078 & 17.134 $\pm$ 1.008 & 6.122 $\pm$ 0.408 \\
-SparseNoGraph & 0.950 $\pm$ 0.033 & 17.166 $\pm$ 1.035 & 6.092 $\pm$ 0.413 \\
-Proposed & 0.744 $\pm$ 0.051 & 15.764 $\pm$ 1.104 & 6.003 $\pm$ 0.384 \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
+\subsection{Effect of Regularization Strength (Chain)}
+Figure~\ref{fig:phase2-chain} shows the $\lambda_2$ sweep on chain graphs under clean, delete, and rewire priors. At low $\lambda_2$, curves overlap, indicating robustness when the graph prior is weak. At higher $\lambda_2$, the chain becomes misspecification-sensitive: clean retains higher recovery, deletion degrades moderately, and rewire degrades most. This establishes the chain mechanism—strong regularization amplifies errors in local adjacency.
 
-\subsection{Graph-Aligned Chain Setting (Disjoint Supports + Scattered Decoys)}
-Figure~\ref{fig:graph-aligned-sweep} summarizes the graph-aligned chain experiment. Moderate $\lambda_2$ keeps support recovery within a small F1 margin of the strongest sparse baselines while improving both smoothness and support connectivity. Table~\ref{tab:graph-aligned-summary} reports a representative $\lambda_2=0.1$ setting, showing that the Proposed method remains within roughly 1--2 F1 points while improving structural connectivity and smoothness.
+\subsection{Topology-Dependent Robustness (Chain vs Grid)}
+Figure~\ref{fig:phase2-compare} contrasts chain and grid under the same corruption and $\lambda_2$ sweep. The chain exhibits clear degradation under rewiring at moderate-to-high $\lambda_2$, while grid graphs remain largely invariant under the same perturbations. Quantitatively, the clean--rewire gap in support F1 at $\lambda_2=0.5$ and $1.0$ is $+0.058$ and $+0.076$ for the chain, but $-0.041$ and $-0.028$ for the grid. The small sign changes on the grid indicate that misspecification effects are weak and unstable in direction, consistent with robustness rather than genuine benefit.
+
+\subsection{Signal--Graph Compatibility}
+We vary support structure to isolate when the graph prior matches the signal. Figure~\ref{fig:compat-chain} and Figure~\ref{fig:compat-grid} show that graph-aligned supports (connected or multi-cluster) achieve higher recovery than fragmented supports across the $\lambda_2$ sweep. On SBM (Figure~\ref{fig:compat-sbm}), cross-community supports degrade more rapidly at moderate-to-high $\lambda_2$ than within-community supports, indicating that mismatch between signal structure and graph topology amplifies the cost of strong regularization.
+
+\subsection{Multi-Component Validation}
+We test whether the observed regimes persist when extracting multiple components on SBM graphs. Figure~\ref{fig:multicomp-connected}, Figure~\ref{fig:multicomp-fragmented}, and Figure~\ref{fig:multicomp-cross} summarize mean per-component recovery and orthogonality error for $r \in \{2,3,5\}$. Across SBM regimes (connected, fragmented, and cross-community), a consistent regime pattern emerges: low--to--moderate $\lambda_2$ yields stronger recovery, while higher $\lambda_2$ leads to substantial degradation. Orthogonality remains stable across all settings, indicating that the observed degradation arises from over-regularization rather than optimization instability.
+
+\subsection{Corruption-Strength Sweep (Chain)}
+Figure~\ref{fig:phase2-alpha} reports a phase diagram over $(\lambda_2, \alpha)$ for chain graphs, with separate panels for deletion and rewiring. Misspecification effects strengthen with increasing $\alpha$, and the most pronounced degradation occurs when both $\lambda_2$ and $\alpha$ are large. The diagram summarizes the regime boundary between robust low-$\lambda_2$ behavior and high-$\lambda_2$ sensitivity to corruption.
+As $\alpha$ increases, the low-$\lambda_2$ region remains relatively stable, while high-$\lambda_2$ performance degrades more sharply, indicating that corruption strength and regularization jointly determine the regime boundary.
+
+\subsection{Real-Data Sanity Check (TCGA-BRCA + STRING)}
+We run a $\lambda_2$ sweep on TCGA-BRCA expression with a STRING PPI graph using three random initializations and report smoothness and shared explained variance (Figure~\ref{fig:realdata}). We observe that moderate $\lambda_2$ yields stable variance--smoothness tradeoffs, while larger $\lambda_2$ leads to more aggressive smoothing with diminishing variance gains, consistent with the synthetic regime behavior. A subsampling robustness sweep (80\% subsamples, 3 seeds; Figure~\ref{fig:realdata-robust}) shows the same qualitative pattern across random subsamples. For real data we show the proposed method only, since support recovery metrics are not defined without ground truth.
+
+\subsection{Interpretation}
+The $\lambda_2$ axis controls prior strength, moving from weak to strong regularization. The topology axis distinguishes fragile graphs (chains) from redundant graphs (grids). The experiments show that misspecification sensitivity depends jointly on regularization strength and topology: strong graph regularization amplifies misspecification on fragile structures, while redundant topologies yield near-invariant performance. We also observe illusory smoothness: rewiring can increase smoothness measured under the corrupted prior without improving alignment with the true graph, particularly when recovery degrades.
+
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{graph_aligned_lambda2_sweep_panel.png}
-\caption{Graph-aligned chain sweep (seeds 0--2). Proposed and SparseNoGraph are shown with uncertainty bands; A-ManPG is a horizontal reference line.}
-\label{fig:graph-aligned-sweep}
-\end{figure}
-
-\begin{table}[t]
-\centering
-\scriptsize
-\setlength{\tabcolsep}{3pt}
-\caption{Graph-aligned chain (representative $\lambda_2=0.1$, seeds 0--2). Mean $\pm$ std for shared metrics.}
-\label{tab:graph-aligned-summary}
-\resizebox{\linewidth}{!}{%
-\begin{tabular}{lccc}
-\toprule
-Method & Support F1 & Smoothness (norm) & Largest CC ratio \\
-\midrule
-PCA & 0.261 $\pm$ 0.000 & 2.047 $\pm$ 0.472 & 1.000 $\pm$ 0.000 \\
-A-ManPG & 0.861 $\pm$ 0.016 & 2.049 $\pm$ 0.471 & 0.286 $\pm$ 0.014 \\
-SparseNoGraph & 0.934 $\pm$ 0.047 & 2.049 $\pm$ 0.457 & 0.302 $\pm$ 0.039 \\
-Proposed & 0.914 $\pm$ 0.016 & 1.810 $\pm$ 0.456 & 0.377 $\pm$ 0.014 \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-
-\subsection{Multi-Seed \texorpdfstring{$\lambda_2$}{lambda2} Sweeps}
-Sweeping $\lambda_2 \in \{0.0, 0.05, 0.1, 0.2, 0.5\}$ across seeds (0--2) reveals stable smoothness--recovery tradeoffs with topology-dependent sensitivity. On SBM, stronger regularization steadily reduces support F1 while improving smoothness; light regularization improves smoothness with limited recovery loss. On chain graphs, the same sweep shows a milder recovery penalty for comparable smoothness gains. In all sweeps, A-ManPG provides a fixed sparse baseline reference line.
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{sbm_lambda2_sweep_panel.png}
-\caption{SBM $\lambda_2$ sweep (seeds 0--2). Curves show mean $\pm$ std across seeds; A-ManPG is a horizontal reference line.}
-\label{fig:sbm-lambda2-sweep}
+\includegraphics[width=\linewidth]{phase2/blockA/blockA_sanity_lambda2_sweep.png}
+\caption{$\lambda_2$ sweep on chain graphs under clean, delete, and rewire priors. At low $\lambda_2$, all conditions behave similarly; at higher $\lambda_2$, misspecification induces clear degradation, with rewiring most harmful.}
+\label{fig:phase2-chain}
 \end{figure}
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{chain_lambda2_sweep_panel.png}
-\caption{Chain $\lambda_2$ sweep (seeds 0--2). Curves show mean $\pm$ std across seeds; A-ManPG is a horizontal reference line.}
-\label{fig:chain-lambda2-sweep}
+\includegraphics[width=\linewidth]{phase2/compare/blockAB_chain_grid_lambda2_sweep.png}
+\caption{Effect of graph misspecification across graph topologies. Chain graphs (left) show increasing degradation under misspecification as $\lambda_2$ grows, with rewiring more harmful than edge deletion. Grid graphs (right) remain largely invariant under the same perturbations, indicating that misspecification sensitivity depends jointly on regularization strength and topology.}
+\label{fig:phase2-compare}
 \end{figure}
 
-\section{Discussion and Limitations}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{phase2/compatibility/compat_chain_lambda2_sweep.png}
+\caption{Compatibility sweep on chain graphs. Graph-aligned supports (connected, multi-cluster) maintain higher recovery than fragmented supports as $\lambda_2$ increases.}
+\label{fig:compat-chain}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{phase2/compatibility/compat_grid_lambda2_sweep.png}
+\caption{Compatibility sweep on grid graphs. Recovery is highest for connected and multi-cluster supports and declines more sharply for fragmented supports at larger $\lambda_2$.}
+\label{fig:compat-grid}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{phase2/compatibility/compat_sbm_lambda2_sweep.png}
+\caption{Compatibility sweep on SBM graphs. Cross-community supports degrade more rapidly at moderate-to-high $\lambda_2$ than within-community supports, indicating a mismatch penalty.}
+\label{fig:compat-sbm}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{phase2/multicomponent/multicomp_connected_lambda2_sweep.png}
+\caption{Multi-component sweep on SBM graphs with connected supports. Mean per-component F1 and orthogonality error are reported for $r \in \{2,3,5\}$; recovery decreases at higher $\lambda_2$ while orthogonality remains stable.}
+\label{fig:multicomp-connected}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{phase2/multicomponent/multicomp_fragmented_lambda2_sweep.png}
+\caption{Multi-component sweep on SBM graphs with fragmented supports. Mean per-component F1 and orthogonality error are reported for $r \in \{2,3,5\}$; recovery declines more sharply as $\lambda_2$ increases while orthogonality remains stable.}
+\label{fig:multicomp-fragmented}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{phase2/multicomponent/multicomp_cross_community_lambda2_sweep.png}
+\caption{Multi-component sweep on SBM graphs with cross-community supports. Mean per-component F1 and orthogonality error are reported for $r \in \{2,3,5\}$; strong regularization amplifies mismatch, yielding lower recovery at higher $\lambda_2$ despite stable orthogonality.}
+\label{fig:multicomp-cross}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{phase2/compare/phase2_chain_alpha_lambda2_phase_diagram.png}
+\caption{Phase diagram on chain graphs. Support F1 as a function of $(\lambda_2,\alpha)$ for deletion (left) and rewiring (right). Sensitivity grows as both $\lambda_2$ and $\alpha$ increase, delimiting a robust low-$\lambda_2$ region.}
+\label{fig:phase2-alpha}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{phase2/realdata/realdata_lambda2_sweep.png}
+\caption{Real-data $\lambda_2$ sweep on TCGA-BRCA with STRING graph. Increasing $\lambda_2$ produces progressively smoother solutions, while explained variance improves up to a moderate regime and then plateaus with slight decline at higher $\lambda_2$. This pattern is consistent with the regime behavior observed in synthetic experiments, where moderate regularization yields favorable variance--smoothness tradeoffs and stronger regularization leads to diminishing returns.}
+\label{fig:realdata}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{phase2/realdata/realdata_subsample_lambda2_sweep.png}
+\caption{Real-data robustness sweep on TCGA-BRCA under random 80\% subsampling (3 seeds). The variance--smoothness tradeoff remains consistent across subsamples, with diminishing variance gains at higher $\lambda_2$.}
+\label{fig:realdata-robust}
+\end{figure}
+
+\section{Discussion}
 \label{sec:discussion}
 
-These experiments establish a focused empirical message: in our synthetic experiments, graph regularization yields smoother solutions on the true graph for both chain and SBM settings, but its effect on support recovery is topology-dependent. On chain graphs, the proposed method remains competitive on recovery while producing smoother supports, consistent with the intuition that chain structure aligns well with Laplacian smoothness. On SBM graphs, the graph prior enforces smoother structure at the cost of recovery accuracy, yielding a stable tradeoff rather than a contradiction. In the graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, moderate regularization preserves recovery while improving support connectivity, indicating a setting where the graph prior is beneficial for structural fidelity.
+Our experiments support a regime-based view of graph regularization under misspecification. The effect of the graph prior depends jointly on regularization strength and graph topology. When $\lambda_2$ is small, the prior has limited influence and performance is similar across clean and corrupted graphs. As $\lambda_2$ increases, the prior becomes more influential, and misspecification effects depend on how fragile the underlying topology is.
 
-The chain setting aligns naturally with local smoothness, whereas the SBM setting emphasizes block/community structure; as a result, the same smoothness penalty can act as a mild regularizer in one topology and as an oversmoothing force in another. The $\lambda_2$ sweep on SBM makes this explicit: mild regularization yields smoother solutions with limited recovery loss, whereas stronger regularization oversmooths and reduces recovery. These observations imply that $\lambda_2$ must be tuned with respect to graph topology rather than assumed to be universally beneficial.
+For chain graphs, misspecification induces clear degradation at moderate-to-high $\lambda_2$, with rewiring more harmful than edge deletion. This indicates that under strong graph regularization, incorrect structure can be more damaging than missing structure. For grid graphs, by contrast, performance remains largely invariant under the same corruption level, suggesting that redundant topology mitigates misspecification effects. In this setting, small performance differences may fluctuate in sign, which we interpret as evidence that the effect is weak and unstable in direction rather than a genuine benefit from misspecification.
 
-The main limitation of the current evidence is that it remains synthetic and focuses on two graph families with a single data generator. This is appropriate for a focused empirical study, whose goal is to establish a disciplined method and a clear empirical tradeoff. The results demonstrate that structural priors can improve graph coherence, but they also show that regularization strength must be tuned to topology. If the graph-aligned setting fails to preserve recovery, the correct conclusion is a tradeoff characterization rather than a recovery-improving claim.
+A mechanism-level view ties these observations together. The Laplacian term acts as a graph prior whose influence scales with $\lambda_2$: when $\lambda_2$ is small, the data term dominates and the optimizer is insensitive to moderate prior errors; when $\lambda_2$ is large, the prior dominates and any mismatch in graph structure can distort the recovered components.
+
+Topology governs how damaging that distortion becomes. Chains are fragile because smoothness is tied to precise local adjacency, so rewiring directly disrupts the low-frequency directions the prior is meant to promote. Grids are redundant: many neighboring paths induce similar smooth directions, which flattens the optimization landscape and makes performance relatively invariant even when edges are perturbed.
+
+A notable pattern is that rewiring can produce smoother solutions under the corrupted prior without improving alignment with the true graph. This illusory smoothness highlights a critical distinction between smoothness under the imposed prior and structural fidelity measured against the true graph.
+
+\paragraph{Limitations.}
+The study remains narrow: we use two synthetic graph families and a single real dataset, and the corruption-strength sweep is reported only for chain graphs. Chain and grid represent two canonical extremes---locally fragile versus redundantly connected---allowing controlled isolation of topology effects. The real-data experiment is intended as a sanity check rather than a comprehensive benchmark, and a formal analysis of regime boundaries is an interesting direction for future work. Broader topology families, multiple real datasets, and systematic corruption sweeps for additional graphs remain important directions for future work. Our claims are therefore intentionally modest: graph regularization is not uniformly beneficial, and its reliability depends on both the strength of regularization and the structural robustness of the imposed graph structure.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-We present synthetic evidence that graph-regularized sparse orthogonal PCA improves structural coherence while inducing a topology-dependent tradeoff with support recovery. On chain graphs, the proposed method is competitive on recovery and yields smoother supports; on SBM graphs, stronger graph regularization improves smoothness but reduces recovery accuracy. In a graph-aligned chain setting with disjoint contiguous supports and scattered decoys, moderate regularization preserves recovery while improving support connectivity. These findings highlight the need for topology-aware $\lambda_2$ tuning and support a modest, defensible claim: graph regularization improves structural coherence, and its recovery impact depends on topology and regularization strength.
+We study graph-smooth sparse orthogonal PCA under controlled graph misspecification and show that its behavior is regime-dependent. At low regularization strength, performance is similar across clean and corrupted graphs, indicating that weak graph priors are comparatively robust. At higher regularization strengths, misspecification effects become topology-dependent: chain graphs exhibit clear degradation, especially under rewiring, whereas grid graphs remain largely invariant under the same perturbations.
+
+These results support a simple but important conclusion: the usefulness of graph regularization is inherently regime- and topology-dependent. Strong graph priors can amplify structural errors in fragile graphs, while redundant topologies mitigate those effects. This suggests that graph regularization should be interpreted not as a universally helpful inductive bias, but as a topology- and regime-sensitive mechanism whose reliability depends on the quality and robustness of the imposed graph structure. Practically, this suggests that graph regularization should be used conservatively unless the graph structure is known to be reliable or topologically redundant.
 
 \fussy
 \bibliographystyle{plain}
