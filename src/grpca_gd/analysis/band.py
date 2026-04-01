@@ -10,8 +10,15 @@ def _mean(values: list[float]) -> float:
     return float(sum(values) / len(values))
 
 
-def _group_means(rows: Iterable[dict[str, Any]], method: str, lambda_key: str, metrics: tuple[str, ...]) -> dict[float, dict[str, float]]:
-    grouped: dict[float, dict[str, list[float]]] = defaultdict(lambda: {metric: [] for metric in metrics})
+def _group_means(
+    rows: Iterable[dict[str, Any]],
+    method: str,
+    lambda_key: str,
+    metrics: tuple[str, ...],
+) -> dict[float, dict[str, float]]:
+    grouped: dict[float, dict[str, list[float]]] = defaultdict(
+        lambda: {metric: [] for metric in metrics}
+    )
     for row in rows:
         if row.get("method") != method:
             continue
@@ -26,7 +33,9 @@ def _group_means(rows: Iterable[dict[str, Any]], method: str, lambda_key: str, m
     }
 
 
-def _longest_contiguous_block(candidates: list[float], ordered_lambdas: list[float]) -> list[float]:
+def _longest_contiguous_block(
+    candidates: list[float], ordered_lambdas: list[float]
+) -> list[float]:
     if not candidates:
         return []
 
@@ -45,7 +54,9 @@ def _longest_contiguous_block(candidates: list[float], ordered_lambdas: list[flo
             best_runs.append(current)
         return best_runs
 
-    interior_lambdas = ordered_lambdas[1:-1] if len(ordered_lambdas) > 2 else ordered_lambdas
+    interior_lambdas = (
+        ordered_lambdas[1:-1] if len(ordered_lambdas) > 2 else ordered_lambdas
+    )
     interior_runs = runs(interior_lambdas)
     if interior_runs:
         return max(interior_runs, key=len)
@@ -64,7 +75,9 @@ def select_band(
 ) -> list[float]:
     rows = list(rows)
     method_means = _group_means(rows, method, "lambda2", (f1_metric, smooth_metric))
-    baseline_means = _group_means(rows, baseline, "lambda2", (f1_metric, smooth_metric))
+    baseline_means = _group_means(
+        rows, baseline, "lambda2", (f1_metric, smooth_metric)
+    )
 
     ordered_lambdas = sorted({float(row["lambda2"]) for row in rows})
     candidates: list[float] = []
@@ -78,7 +91,10 @@ def select_band(
         method_smooth = method_means[lam][smooth_metric]
         baseline_smooth = baseline_means[lam][smooth_metric]
 
-        if method_f1 >= baseline_f1 - f1_tolerance and (baseline_smooth - method_smooth) > smoothness_margin:
+        if (
+            method_f1 >= baseline_f1 - f1_tolerance
+            and (baseline_smooth - method_smooth) >= smoothness_margin
+        ):
             candidates.append(lam)
 
     return _longest_contiguous_block(candidates, ordered_lambdas)
