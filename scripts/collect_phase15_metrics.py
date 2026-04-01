@@ -33,6 +33,8 @@ FIELDNAMES = [
     "graph_smoothness_norm",
     "graph_smoothness_raw",
     "shared_explained_variance",
+    "connect_num_components",
+    "connect_largest_ratio",
     "component_f1_min",
     "component_f1_median",
     "component_f1_mean",
@@ -89,6 +91,7 @@ def _rows_for_run(run: Dict[str, object]) -> List[Dict[str, object]]:
         support_metrics = payload.get("support_metrics", {})
         union = support_metrics.get("union", {})
         summary = component_f1_summary(support_metrics.get("per_component", {}))
+        connectivity = payload.get("support_connectivity_union", {})
         rows.append(
             {
                 "experiment": "trackB_phase15",
@@ -108,6 +111,8 @@ def _rows_for_run(run: Dict[str, object]) -> List[Dict[str, object]]:
                 "graph_smoothness_norm": payload.get("graph_smoothness_norm_trueL"),
                 "graph_smoothness_raw": payload.get("graph_smoothness_raw_trueL"),
                 "shared_explained_variance": payload.get("shared_explained_variance"),
+                "connect_num_components": connectivity.get("num_components"),
+                "connect_largest_ratio": connectivity.get("largest_component_ratio"),
                 **summary,
             }
         )

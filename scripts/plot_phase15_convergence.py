@@ -29,7 +29,7 @@ def main() -> None:
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Coupling gap")
     ax.grid(True, alpha=0.3)
-    ax.legend(title=r"$\\lambda_2$")
+    ax.legend(title=r"$\lambda_2$")
     FIG.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
     fig.savefig(FIG, dpi=200)
