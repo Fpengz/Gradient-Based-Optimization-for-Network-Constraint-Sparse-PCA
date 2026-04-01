@@ -285,7 +285,7 @@ This section is intentionally descriptive rather than a proof development: we do
 We map when graph regularization helps versus hurts by varying regularization strength and topology under controlled misspecification. We focus on chain and grid graphs with a fixed $\lambda_2$ sweep to probe the low-to-moderate regime. The goal is regime characterization, not absolute performance gains.
 
 \paragraph{Experimental setup.}
-We evaluate chain and grid graph families only. Graph corruption is applied to the \emph{prior} graph used by the method; synthetic data and true supports are generated from the clean graph, so the study measures misspecification rather than altered ground truth. We consider two corruption types---edge deletion and random rewiring---with a fixed corruption level $\alpha=0.2$ (fraction of $|E|$). We sweep $\lambda_2 \in \{0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0\}$ with seeds $\{0,1,2\}$ (3 seeds for consistency checks, not statistical claims). Metrics reported are support recovery (F1), graph smoothness on the true graph, and shared explained variance. Baselines include PCA, A-ManPG, SparseNoGraph ($\lambda_2=0$), and the Proposed method. All methods are implemented in NumPy.
+We evaluate chain and grid graph families only for the corruption and topology experiments; SBM is used only for compatibility and multi-component validation. Graph corruption is applied to the \emph{prior} graph used by the method; synthetic data and true supports are generated from the clean graph, so the study measures misspecification rather than altered ground truth. We consider two corruption types---edge deletion and random rewiring---with a fixed corruption level $\alpha=0.2$ (fraction of $|E|$). We sweep $\lambda_2 \in \{0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0\}$ with seeds $\{0,1,2\}$ (3 seeds for consistency checks, not statistical claims). Metrics reported are support recovery (F1), graph smoothness on the true graph, and shared explained variance. Baselines include PCA, A-ManPG, SparseNoGraph ($\lambda_2=0$), and the Proposed method. All methods are implemented in NumPy.
 
 \subsection{Effect of Regularization Strength (Chain)}
 Figure~\ref{fig:phase2-chain} shows the $\lambda_2$ sweep on chain graphs under clean, delete, and rewire priors. At low $\lambda_2$, curves overlap, indicating robustness when the graph prior is weak. At higher $\lambda_2$, the chain becomes misspecification-sensitive: clean retains higher recovery, deletion degrades moderately, and rewire degrades most. This establishes the chain mechanism—strong regularization amplifies errors in local adjacency.
@@ -304,7 +304,7 @@ Figure~\ref{fig:phase2-alpha} reports a phase diagram over $(\lambda_2, \alpha)$
 As $\alpha$ increases, the low-$\lambda_2$ region remains relatively stable, while high-$\lambda_2$ performance degrades more sharply, indicating that corruption strength and regularization jointly determine the regime boundary.
 
 \subsection{Real-Data Sanity Check (TCGA-BRCA + STRING)}
-We run a $\lambda_2$ sweep on TCGA-BRCA expression with a STRING PPI graph using three random initializations and report smoothness and shared explained variance (Figure~\ref{fig:realdata}). We observe that moderate $\lambda_2$ yields stable variance--smoothness tradeoffs, while larger $\lambda_2$ leads to more aggressive smoothing with diminishing variance gains, consistent with the synthetic regime behavior. A subsampling robustness sweep (Figure~\ref{fig:realdata-robust}) shows the same qualitative pattern across random subsamples.
+We run a $\lambda_2$ sweep on TCGA-BRCA expression with a STRING PPI graph using three random initializations and report smoothness and shared explained variance (Figure~\ref{fig:realdata}). We observe that moderate $\lambda_2$ yields stable variance--smoothness tradeoffs, while larger $\lambda_2$ leads to more aggressive smoothing with diminishing variance gains, consistent with the synthetic regime behavior. A subsampling robustness sweep (80\% subsamples, 3 seeds; Figure~\ref{fig:realdata-robust}) shows the same qualitative pattern across random subsamples. For real data we show the proposed method only, since support recovery metrics are not defined without ground truth.
 
 \subsection{Interpretation}
 The $\lambda_2$ axis controls prior strength, moving from weak to strong regularization. The topology axis distinguishes fragile graphs (chains) from redundant graphs (grids). The experiments show that misspecification sensitivity depends jointly on regularization strength and topology: strong graph regularization amplifies misspecification on fragile structures, while redundant topologies yield near-invariant performance. We also observe illusory smoothness: rewiring can increase smoothness measured under the corrupted prior without improving alignment with the true graph, particularly when recovery degrades.
@@ -347,21 +347,21 @@ The $\lambda_2$ axis controls prior strength, moving from weak to strong regular
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{phase2/multicomponent/multicomp_connected_lambda2_sweep.png}
-\caption{Multi-component sweep on SBM graphs with connected supports. Mean per-component F1 and orthogonality error remain stable at low-to-moderate $\lambda_2$ and degrade only at higher regularization.}
+\caption{Multi-component sweep on SBM graphs with connected supports. Mean per-component F1 and orthogonality error are reported for $r \in \{2,3,5\}$; recovery decreases at higher $\lambda_2$ while orthogonality remains stable.}
 \label{fig:multicomp-connected}
 \end{figure}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{phase2/multicomponent/multicomp_fragmented_lambda2_sweep.png}
-\caption{Multi-component sweep on SBM graphs with fragmented supports. Recovery declines more sharply as $\lambda_2$ increases, while orthogonality remains controlled across $r \in \{2,3,5\}$.}
+\caption{Multi-component sweep on SBM graphs with fragmented supports. Mean per-component F1 and orthogonality error are reported for $r \in \{2,3,5\}$; recovery declines more sharply as $\lambda_2$ increases while orthogonality remains stable.}
 \label{fig:multicomp-fragmented}
 \end{figure}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{phase2/multicomponent/multicomp_cross_community_lambda2_sweep.png}
-\caption{Multi-component sweep on SBM graphs with cross-community supports. Strong regularization amplifies mismatch, yielding lower recovery at higher $\lambda_2$ despite stable orthogonality.}
+\caption{Multi-component sweep on SBM graphs with cross-community supports. Mean per-component F1 and orthogonality error are reported for $r \in \{2,3,5\}$; strong regularization amplifies mismatch, yielding lower recovery at higher $\lambda_2$ despite stable orthogonality.}
 \label{fig:multicomp-cross}
 \end{figure}
 
@@ -382,7 +382,7 @@ The $\lambda_2$ axis controls prior strength, moving from weak to strong regular
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{phase2/realdata/realdata_subsample_lambda2_sweep.png}
-\caption{Real-data robustness sweep on TCGA-BRCA under random subsampling. The variance--smoothness tradeoff remains consistent across subsamples, with diminishing variance gains at higher $\lambda_2$.}
+\caption{Real-data robustness sweep on TCGA-BRCA under random 80\% subsampling (3 seeds). The variance--smoothness tradeoff remains consistent across subsamples, with diminishing variance gains at higher $\lambda_2$.}
 \label{fig:realdata-robust}
 \end{figure}
 
