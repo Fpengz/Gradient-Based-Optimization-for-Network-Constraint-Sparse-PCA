@@ -64,11 +64,14 @@ def small_world_laplacian(
         for j in range(1, k + 1):
             W[i, (i + j) % p] = 1.0
             W[i, (i - j) % p] = 1.0
+    max_attempts = p
     for i in range(p):
         for j in range(1, k + 1):
             if rng.random() < beta:
                 old = (i + j) % p
-                for _ in range(5):
+                # Best-effort rewiring: try a bounded number of random targets,
+                # then keep the original edge if none are valid.
+                for _ in range(max_attempts):
                     new = int(rng.integers(0, p))
                     if new != i and W[i, new] == 0.0:
                         W[i, old] = 0.0
