@@ -3,6 +3,81 @@ from __future__ import annotations
 import numpy as np
 
 
+def normalized_laplacian(W: np.ndarray) -> np.ndarray:
+    deg = np.sum(W, axis=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        inv_sqrt = np.where(deg > 0, 1.0 / np.sqrt(deg), 0.0)
+    D_inv = np.diag(inv_sqrt)
+    return np.eye(W.shape[0]) - D_inv @ W @ D_inv
+
+
+def grid_graph_laplacian(rows: int, cols: int) -> tuple[np.ndarray, np.ndarray]:
+    p = rows * cols
+    W = np.zeros((p, p), dtype=float)
+    for r in range(rows):
+        for c in range(cols):
+            idx = r * cols + c
+            for dr, dc in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                rr, cc = r + dr, c + dc
+                if 0 <= rr < rows and 0 <= cc < cols:
+                    j = rr * cols + cc
+                    W[idx, j] = 1.0
+    W = np.maximum(W, W.T)
+    D = np.diag(np.sum(W, axis=1))
+    L = D - W
+    return L, W
+
+
+def er_graph_laplacian(
+    p: int,
+    p_edge: float,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray]:
+    W = np.triu((rng.random((p, p)) < p_edge).astype(float), 1)
+    W = W + W.T
+    D = np.diag(np.sum(W, axis=1))
+    L = D - W
+    return L, W
+
+
+def knn_graph_laplacian(points: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
+    n = points.shape[0]
+    dists = np.linalg.norm(points[:, None, :] - points[None, :, :], axis=-1)
+    W = np.zeros((n, n), dtype=float)
+    for i in range(n):
+        nn = np.argsort(dists[i])[1 : k + 1]
+        W[i, nn] = 1.0
+    W = np.maximum(W, W.T)
+    D = np.diag(np.sum(W, axis=1))
+    L = D - W
+    return L, W
+
+
+def small_world_laplacian(
+    p: int,
+    k: int,
+    beta: float,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray]:
+    W = np.zeros((p, p), dtype=float)
+    for i in range(p):
+        for j in range(1, k + 1):
+            W[i, (i + j) % p] = 1.0
+            W[i, (i - j) % p] = 1.0
+    for i in range(p):
+        for j in range(1, k + 1):
+            if rng.random() < beta:
+                old = (i + j) % p
+                new = int(rng.integers(0, p))
+                W[i, old] = 0.0
+                W[old, i] = 0.0
+                W[i, new] = 1.0
+                W[new, i] = 1.0
+    D = np.diag(np.sum(W, axis=1))
+    L = D - W
+    return L, W
+
+
 def chain_graph_laplacian(p: int) -> tuple[np.ndarray, np.ndarray]:
     if p < 2:
         raise ValueError("p must be >= 2 for chain graph")
