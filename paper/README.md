@@ -27,6 +27,14 @@ Provenance:
 - Tag: `paper1-phase1.5-submission-v1`
 - Branch: `paper-trackB-phase1.5-submission`
 
+## Track B Phase 1.5 (Claim-Hardening + Real-Data)
+
+**Frozen version:** `paper1-trackB-phase1.5-claim-hardening-realdata-v1`
+
+Includes: real-data sanity check + ΔF1 + robustness
+
+See: `docs/phase1.5-claim-hardening-realdata-changelog.md`
+
 ## Build command (from repo root)
 
 ```bash
