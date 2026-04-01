@@ -68,11 +68,14 @@ def small_world_laplacian(
         for j in range(1, k + 1):
             if rng.random() < beta:
                 old = (i + j) % p
-                new = int(rng.integers(0, p))
-                W[i, old] = 0.0
-                W[old, i] = 0.0
-                W[i, new] = 1.0
-                W[new, i] = 1.0
+                for _ in range(5):
+                    new = int(rng.integers(0, p))
+                    if new != i and W[i, new] == 0.0:
+                        W[i, old] = 0.0
+                        W[old, i] = 0.0
+                        W[i, new] = 1.0
+                        W[new, i] = 1.0
+                        break
     D = np.diag(np.sum(W, axis=1))
     L = D - W
     return L, W

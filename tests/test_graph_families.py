@@ -34,6 +34,12 @@ def test_small_world_shape() -> None:
     assert W.shape == (12, 12)
 
 
+def test_small_world_has_no_self_loops_and_is_symmetric() -> None:
+    _, W = small_world_laplacian(p=12, k=2, beta=0.2, rng=np.random.default_rng(3))
+    assert np.allclose(np.diag(W), np.zeros(12))
+    assert np.allclose(W, W.T)
+
+
 def test_normalized_laplacian_diagonal() -> None:
     W = np.array([[0.0, 1.0], [1.0, 0.0]])
     L = normalized_laplacian(W)
