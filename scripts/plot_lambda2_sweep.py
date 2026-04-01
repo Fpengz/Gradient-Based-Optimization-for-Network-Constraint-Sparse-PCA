@@ -76,6 +76,8 @@ def main() -> None:
     df = pd.read_csv(SUMMARY)
     _plot_family(df, "sbm", "sbm_lambda2_sweep_panel.png")
     _plot_family(df, "chain", "chain_lambda2_sweep_panel.png")
+    if (df["graph_family"] == "grid").any():
+        _plot_family(df, "grid", "grid_lambda2_sweep_panel.png")
 
 
 if __name__ == "__main__":

@@ -19,6 +19,8 @@ def _load_json(path: Path) -> Dict:
 
 
 def _experiment_label(cfg: Dict, output_dir: str) -> str:
+    if cfg.get("dataset_type") == "real":
+        return "real_data"
     support_type = cfg.get("support_type")
     if support_type == "connected_disjoint":
         return "graph_aligned"
@@ -75,6 +77,7 @@ def main() -> None:
                     "graph_smoothness_norm": payload.get("graph_smoothness_norm_trueL"),
                     "graph_smoothness_raw": payload.get("graph_smoothness_raw_trueL"),
                     "shared_explained_variance": payload.get("shared_explained_variance"),
+                    "sparsity_fraction": payload.get("sparsity_fraction"),
                     "connect_num_components": conn.get("num_components"),
                     "connect_largest_ratio": conn.get("largest_component_ratio"),
                 }

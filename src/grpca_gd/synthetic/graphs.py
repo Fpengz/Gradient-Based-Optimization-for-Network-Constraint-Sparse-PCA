@@ -51,3 +51,29 @@ def sbm_graph_laplacian(
     D = np.diag(np.sum(W, axis=1))
     L = D - W
     return L, W
+
+
+def grid_graph_laplacian(rows: int, cols: int) -> tuple[np.ndarray, np.ndarray]:
+    if rows <= 0 or cols <= 0:
+        raise ValueError("rows and cols must be positive")
+    p = rows * cols
+    W = np.zeros((p, p), dtype=float)
+
+    def idx(r: int, c: int) -> int:
+        return r * cols + c
+
+    for r in range(rows):
+        for c in range(cols):
+            i = idx(r, c)
+            if r + 1 < rows:
+                j = idx(r + 1, c)
+                W[i, j] = 1.0
+                W[j, i] = 1.0
+            if c + 1 < cols:
+                j = idx(r, c + 1)
+                W[i, j] = 1.0
+                W[j, i] = 1.0
+
+    D = np.diag(np.sum(W, axis=1))
+    L = D - W
+    return L, W

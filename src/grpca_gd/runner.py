@@ -25,8 +25,9 @@ from .metrics import (
 )
 from .objective import objective_terms
 from .solver import SolverConfig, solve, soft_threshold
+from .real_data import load_tcga_brca_with_string
 from .synthetic.data import generate_dataset
-from .synthetic.graphs import chain_graph_laplacian, sbm_graph_laplacian
+from .synthetic.graphs import chain_graph_laplacian, grid_graph_laplacian, sbm_graph_laplacian
 
 
 def _hash_bytes(data: bytes) -> str:
@@ -60,26 +61,44 @@ def _env_info() -> Dict[str, Any]:
 
 
 def _validate_config(cfg: Dict[str, Any]) -> None:
-    required = [
-        "seed",
-        "n",
-        "p",
-        "r",
-        "support_size",
-        "snr",
-        "lambda1",
-        "lambda2",
-        "rho",
-        "max_iters",
-        "tol_obj",
-        "tol_gap",
-        "tol_orth",
-        "eta_A",
-        "graph_family",
-        "support_type",
-        "baseline",
-        "output_dir",
-    ]
+    dataset_type = cfg.get("dataset_type", "synthetic")
+    if dataset_type == "real":
+        required = [
+            "seed",
+            "lambda1",
+            "lambda2",
+            "rho",
+            "max_iters",
+            "tol_obj",
+            "tol_gap",
+            "tol_orth",
+            "eta_A",
+            "baseline",
+            "output_dir",
+            "dataset_name",
+            "graph_source",
+        ]
+    else:
+        required = [
+            "seed",
+            "n",
+            "p",
+            "r",
+            "support_size",
+            "snr",
+            "lambda1",
+            "lambda2",
+            "rho",
+            "max_iters",
+            "tol_obj",
+            "tol_gap",
+            "tol_orth",
+            "eta_A",
+            "graph_family",
+            "support_type",
+            "baseline",
+            "output_dir",
+        ]
     missing = [k for k in required if k not in cfg]
     if missing:
         raise ValueError(f"Missing config fields: {missing}")
@@ -123,43 +142,79 @@ def run(config_path: str) -> None:
     dataset = None
     diagnostics = None
     try:
-        graph_family = cfg["graph_family"]
-        if graph_family == "chain":
-            L, _ = chain_graph_laplacian(cfg["p"])
-        elif graph_family == "sbm":
-            rng = np.random.default_rng(cfg["seed"] + 123)
-            blocks = int(cfg.get("sbm_blocks", 3))
-            p_in = float(cfg.get("sbm_p_in", 0.2))
-            p_out = float(cfg.get("sbm_p_out", 0.02))
-            block_sizes = cfg.get("sbm_block_sizes")
-            if block_sizes is not None:
-                block_sizes = [int(x) for x in block_sizes]
-            L, _ = sbm_graph_laplacian(
-                cfg["p"], blocks, p_in, p_out, rng, block_sizes=block_sizes
+        dataset_type = cfg.get("dataset_type", "synthetic")
+        if dataset_type == "real":
+            cache_dir = Path(cfg.get("cache_dir", "data/real"))
+            max_genes = int(cfg.get("max_genes", 2000))
+            string_threshold = int(cfg.get("string_score_threshold", 700))
+            string_version = str(cfg.get("string_version", "11.5"))
+            real = load_tcga_brca_with_string(
+                cache_dir=cache_dir,
+                max_genes=max_genes,
+                seed=int(cfg["seed"]),
+                score_threshold=string_threshold,
+                string_version=string_version,
             )
+            X = real.X
+            L = real.L
+            dataset = real
+            Sigma_hat = (X.T @ X) / X.shape[0]
+            r = int(cfg.get("r", 3))
         else:
-            raise ValueError("graph_family must be 'chain' or 'sbm'")
-        dataset = generate_dataset(
-            n=cfg["n"],
-            p=cfg["p"],
-            r=cfg["r"],
-            support_size=cfg["support_size"],
-            support_type=cfg["support_type"],
-            L=L,
-            snr=cfg["snr"],
-            signal_eigs=cfg.get("signal_eigs"),
-            seed=cfg["seed"],
-            decoy_count=int(cfg.get("decoy_count", 0)),
-            decoy_variance_factor=float(cfg.get("decoy_variance_factor", 0.0)),
-        )
-
-        Sigma_hat = dataset.Sigma_hat
-        eigvals, V = _pca_top_r(Sigma_hat, cfg["r"])
+            graph_family = cfg["graph_family"]
+            if graph_family == "chain":
+                L, _ = chain_graph_laplacian(cfg["p"])
+            elif graph_family == "sbm":
+                rng = np.random.default_rng(cfg["seed"] + 123)
+                blocks = int(cfg.get("sbm_blocks", 3))
+                p_in = float(cfg.get("sbm_p_in", 0.2))
+                p_out = float(cfg.get("sbm_p_out", 0.02))
+                block_sizes = cfg.get("sbm_block_sizes")
+                if block_sizes is not None:
+                    block_sizes = [int(x) for x in block_sizes]
+                L, _ = sbm_graph_laplacian(
+                    cfg["p"], blocks, p_in, p_out, rng, block_sizes=block_sizes
+                )
+            elif graph_family == "grid":
+                rows = int(cfg.get("grid_rows", 0))
+                cols = int(cfg.get("grid_cols", 0))
+                if rows == 0 or cols == 0:
+                    side = int(np.sqrt(cfg["p"]))
+                    rows = side
+                    cols = side
+                L, _ = grid_graph_laplacian(rows, cols)
+            else:
+                raise ValueError("graph_family must be 'chain', 'sbm', or 'grid'")
+            dataset = generate_dataset(
+                n=cfg["n"],
+                p=cfg["p"],
+                r=cfg["r"],
+                support_size=cfg["support_size"],
+                support_type=cfg["support_type"],
+                L=L,
+                snr=cfg["snr"],
+                signal_eigs=cfg.get("signal_eigs"),
+                seed=cfg["seed"],
+                decoy_count=int(cfg.get("decoy_count", 0)),
+                decoy_variance_factor=float(cfg.get("decoy_variance_factor", 0.0)),
+            )
+            Sigma_hat = dataset.Sigma_hat
+            r = cfg["r"]
+        eigvals, V = _pca_top_r(Sigma_hat, r)
         A_pca = V
         B_pca = V
-
-        B_aligned_pca, perm_pca, signs_pca = _alignment(A_pca, B_pca, dataset.true_loadings)
-        support_pca = support_metrics(B_aligned_pca, dataset.true_supports)
+        has_truth = getattr(dataset, "true_loadings", None) is not None
+        if has_truth:
+            B_aligned_pca, perm_pca, signs_pca = _alignment(
+                A_pca, B_pca, dataset.true_loadings
+            )
+            support_pca = support_metrics(B_aligned_pca, dataset.true_supports)
+            pca_union_mask = np.any(np.abs(B_aligned_pca) > 1e-8, axis=1)
+        else:
+            perm_pca = None
+            signs_pca = None
+            support_pca = {}
+            pca_union_mask = np.any(np.abs(B_pca) > 1e-8, axis=1)
 
         pca_eval = {
             "method_name": "PCA",
@@ -182,7 +237,6 @@ def run(config_path: str) -> None:
             "graph_smoothness_norm_trueL": graph_smoothness_norm(B_pca, L),
             "shared_explained_variance": explained_variance(A_pca, Sigma_hat),
         }
-        pca_union_mask = np.any(np.abs(B_aligned_pca) > 1e-8, axis=1)
         pca_eval["support_connectivity_union"] = support_connectivity(pca_union_mask, L)
         metrics_out["PCA"] = pca_eval
 
@@ -197,10 +251,17 @@ def run(config_path: str) -> None:
         )
         amanpg_result = solve_amanpg(A0, Sigma_hat, amanpg_cfg)
         amanpg_B = amanpg_result.A
-        amanpg_aligned, amanpg_perm, amanpg_signs = _alignment(
-            amanpg_result.A, amanpg_B, dataset.true_loadings
-        )
-        amanpg_support = support_metrics(amanpg_aligned, dataset.true_supports)
+        if has_truth:
+            amanpg_aligned, amanpg_perm, amanpg_signs = _alignment(
+                amanpg_result.A, amanpg_B, dataset.true_loadings
+            )
+            amanpg_support = support_metrics(amanpg_aligned, dataset.true_supports)
+            amanpg_union_mask = np.any(np.abs(amanpg_aligned) > 1e-8, axis=1)
+        else:
+            amanpg_perm = None
+            amanpg_signs = None
+            amanpg_support = {}
+            amanpg_union_mask = np.any(np.abs(amanpg_B) > 1e-8, axis=1)
         amanpg_eval = {
             "method_name": "A-ManPG",
             "objective_terms": objective_terms(
@@ -222,7 +283,6 @@ def run(config_path: str) -> None:
                 orthonormalize(amanpg_B), Sigma_hat
             ),
         }
-        amanpg_union_mask = np.any(np.abs(amanpg_aligned) > 1e-8, axis=1)
         amanpg_eval["support_connectivity_union"] = support_connectivity(
             amanpg_union_mask, L
         )
@@ -240,8 +300,15 @@ def run(config_path: str) -> None:
         )
         result = solve(A0, B0, Sigma_hat, L, solver_cfg)
 
-        B_aligned, perm, signs = _alignment(result.A, result.B, dataset.true_loadings)
-        support = support_metrics(B_aligned, dataset.true_supports)
+        if has_truth:
+            B_aligned, perm, signs = _alignment(result.A, result.B, dataset.true_loadings)
+            support = support_metrics(B_aligned, dataset.true_supports)
+            proposed_union_mask = np.any(np.abs(B_aligned) > 1e-8, axis=1)
+        else:
+            perm = None
+            signs = None
+            support = {}
+            proposed_union_mask = np.any(np.abs(result.B) > 1e-8, axis=1)
 
         # Sparse PCA baseline (no graph regularization)
         L_zero = np.zeros_like(L)
@@ -256,10 +323,17 @@ def run(config_path: str) -> None:
             tol_orth=cfg["tol_orth"],
         )
         spca_result = solve(A0, B0, Sigma_hat, L_zero, spca_cfg)
-        spca_aligned, spca_perm, spca_signs = _alignment(
-            spca_result.A, spca_result.B, dataset.true_loadings
-        )
-        spca_support = support_metrics(spca_aligned, dataset.true_supports)
+        if has_truth:
+            spca_aligned, spca_perm, spca_signs = _alignment(
+                spca_result.A, spca_result.B, dataset.true_loadings
+            )
+            spca_support = support_metrics(spca_aligned, dataset.true_supports)
+            spca_union_mask = np.any(np.abs(spca_aligned) > 1e-8, axis=1)
+        else:
+            spca_perm = None
+            spca_signs = None
+            spca_support = {}
+            spca_union_mask = np.any(np.abs(spca_result.B) > 1e-8, axis=1)
 
         proposed_eval = {
             "method_name": "Proposed",
@@ -282,7 +356,6 @@ def run(config_path: str) -> None:
                 orthonormalize(result.B), Sigma_hat
             ),
         }
-        proposed_union_mask = np.any(np.abs(B_aligned) > 1e-8, axis=1)
         proposed_eval["support_connectivity_union"] = support_connectivity(
             proposed_union_mask, L
         )
@@ -309,7 +382,6 @@ def run(config_path: str) -> None:
                 orthonormalize(spca_result.B), Sigma_hat
             ),
         }
-        spca_union_mask = np.any(np.abs(spca_aligned) > 1e-8, axis=1)
         spca_eval["support_connectivity_union"] = support_connectivity(
             spca_union_mask, L
         )
@@ -327,11 +399,8 @@ def run(config_path: str) -> None:
             "amanpg_matching_signs": amanpg_signs,
             "pca_A": A_pca,
             "pca_B": B_pca,
-            "Sigma_true": dataset.Sigma_true,
-            "Sigma_hat": dataset.Sigma_hat,
-            "L": dataset.L,
-            "true_loadings": dataset.true_loadings,
-            "true_support": np.array(dataset.true_supports, dtype=object),
+            "Sigma_hat": Sigma_hat,
+            "L": L,
             "matching_perm": perm,
             "matching_signs": signs,
             "pca_matching_perm": perm_pca,
@@ -339,6 +408,14 @@ def run(config_path: str) -> None:
             **{f"amanpg_history_{k}": v for k, v in amanpg_result.history.items()},
             **{f"history_{k}": v for k, v in history_arrays.items()},
         }
+        if has_truth:
+            arrays.update(
+                {
+                    "Sigma_true": dataset.Sigma_true,
+                    "true_loadings": dataset.true_loadings,
+                    "true_support": np.array(dataset.true_supports, dtype=object),
+                }
+            )
 
         _write_convergence_plots(output_dir / "plots", history_arrays)
 
@@ -350,12 +427,18 @@ def run(config_path: str) -> None:
     end_time = time.time()
     runtime = end_time - start_time
 
+    dataset_hash = None
+    if dataset is not None and hasattr(dataset, "Sigma_true"):
+        dataset_hash = _hash_array(dataset.Sigma_true)
+    elif dataset is not None:
+        dataset_hash = _hash_array(Sigma_hat)
+
     manifest = {
         "status": status,
         "failure_reason": failure_reason,
         "runtime_sec": runtime,
         "config_hash": _hash_config(cfg),
-        "dataset_hash": _hash_array(dataset.Sigma_true) if dataset is not None else None,
+        "dataset_hash": dataset_hash,
         "git_hash": _git_hash(),
         "tuning_note": "Defaults rho=5.0 and eta_A=0.05 selected for improved coupling behavior on r=1 and r=3 smoke runs without harming recovery.",
         **_env_info(),

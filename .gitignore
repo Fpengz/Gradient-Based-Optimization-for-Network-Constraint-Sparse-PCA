@@ -40,5 +40,6 @@ outputs_*/
 multirun/
 papers/**/build/
 .worktrees/
+data/real/
 !results/reporting_template.md
 !paper/*.pdf

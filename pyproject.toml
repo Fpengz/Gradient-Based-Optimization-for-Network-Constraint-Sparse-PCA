@@ -10,4 +10,5 @@ dependencies = [
   "pyyaml",
   "matplotlib",
   "pytest",
+  "pandas>=3.0.2",
 ]
