@@ -10,4 +10,7 @@ dependencies = [
   "pyyaml",
   "matplotlib",
   "pytest",
+  "pandas",
+  "scikit-learn",
+  "yfinance",
 ]
