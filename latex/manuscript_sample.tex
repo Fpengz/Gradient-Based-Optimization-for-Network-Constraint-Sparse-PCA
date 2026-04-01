@@ -432,9 +432,9 @@ We present synthetic evidence that graph-regularized sparse orthogonal PCA impro
 
 We provide additional diagnostics for the graph-aligned high-decoy setting to support the low-to-moderate $\\lambda_2$ regime claim.
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Per-$\\lambda_2$ inference (Holm/BH):} Adjusted tests show statistically significant improvements in normalized graph smoothness for all $\\lambda_2$, while no adjusted comparison detects a support-F1 difference versus SparseNoGraph within the low-to-moderate regime. (See \texttt{results/trackB/phase1\_5/phase15\_per\_lambda\_holm\_bh.csv}.)
-    \item \textbf{Band-edge diagnostics:} Local comparisons at $\\lambda_2\\in\\{0.04, 0.05, 0.10, 0.11, 0.12\\}$ indicate a gradual transition: confidence intervals for $\\Delta$F1 include zero through $\\lambda_2\\approx 0.12$, while smoothness gains increase monotonically. (See \texttt{results/trackB/phase1\_5/phase15\_band\_edge\_summary.csv}.)
-    \item \textbf{Component-level checks:} Component-wise metrics do not indicate hidden degradation within the regime; worst-component F1 does not collapse and is slightly improved at $\\lambda_2=0.04$--$0.05$. (See \texttt{results/trackB/phase1\_5/phase15\_component\_summary.csv}.)
+    \item \textbf{Per-$\\lambda_2$ inference (Holm/BH):} Adjusted tests show statistically significant improvements in normalized graph smoothness for all $\\lambda_2$, while no adjusted comparison detects a support-F1 difference versus SparseNoGraph within the low-to-moderate regime. (See \path{results/trackB/phase1_5/phase15_per_lambda_holm_bh.csv}.)
+    \item \textbf{Band-edge diagnostics:} Local comparisons at $\\lambda_2\\in\\{0.04, 0.05, 0.10, 0.11, 0.12\\}$ indicate a gradual transition: confidence intervals for $\\Delta$F1 include zero through $\\lambda_2\\approx 0.12$, while smoothness gains increase monotonically. (See \path{results/trackB/phase1_5/phase15_band_edge_summary.csv}.)
+    \item \textbf{Component-level checks:} Component-wise metrics do not indicate hidden degradation within the regime; worst-component F1 does not collapse and is slightly improved at $\\lambda_2=0.04$--$0.05$. (See \path{results/trackB/phase1_5/phase15_component_summary.csv}.)
     \item \textbf{Solver diagnostics:} Coupling-gap traces remain stable across representative $\\lambda_2$ values; larger final gaps appear under stronger regularization without instability in the useful regime.
 \end{itemize}
 
