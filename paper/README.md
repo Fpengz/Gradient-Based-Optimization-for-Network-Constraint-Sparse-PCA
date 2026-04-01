@@ -21,3 +21,19 @@ BIBINPUTS=latex: bibtex manuscript_sample
 pdflatex latex/manuscript_sample.tex
 pdflatex latex/manuscript_sample.tex
 ```
+
+## paper1-phase1.5-submission-v1 (Frozen)
+
+This is the submission snapshot for Phase 1.5.
+
+Includes:
+- Final manuscript with ΔF1 panel (Proposed − SparseNoGraph)
+- Repeatable low-to-moderate λ2 regime claim
+- Explicit non-claim (no universal recovery improvement)
+- Robustness across λ1 and ρ
+- Reproducible plotting script
+
+Tag: `paper1-phase1.5-submission-v1`  
+Branch: `paper1-phase1.5-submission`
+
+This version is frozen and should not be modified.
