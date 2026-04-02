@@ -9,6 +9,44 @@ from typing import Dict, Iterable, List
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUTS = ROOT / "outputs"
 
+CANONICAL_FIELDS = [
+    "dataset",
+    "graph_family",
+    "artifact_id",
+    "artifact_version",
+    "data_source",
+    "prep_config_hash",
+    "eval_protocol_id",
+    "method",
+    "method_version",
+    "seed",
+    "rank",
+    "lambda1",
+    "lambda2",
+    "rho",
+    "corruption_type",
+    "corruption_level",
+    "graph_used_id",
+    "graph_reference_id",
+    "explained_variance",
+    "smoothness_used_graph",
+    "smoothness_reference_graph",
+    "runtime_sec",
+    "iterations",
+    "nnz_loadings",
+    "sparsity_ratio",
+    "final_objective",
+    "final_coupling_gap",
+    "final_orthogonality_defect",
+    "stop_reason",
+    "convergence_flag",
+    "support_precision",
+    "support_recall",
+    "support_f1",
+    "n_samples",
+    "n_features",
+]
+
 
 def _load_json(path: Path) -> Dict:
     with path.open("r", encoding="utf-8") as f:
@@ -37,6 +75,7 @@ def _iter_runs() -> Iterable[Dict]:
         yield {
             "cfg": cfg,
             "metrics": metrics,
+            "artifacts": artifacts,
             "output_dir": output_dir,
         }
 
@@ -46,35 +85,47 @@ def main() -> None:
     for run in _iter_runs():
         cfg = run["cfg"]
         metrics = run["metrics"]
+        artifacts = run["artifacts"]
         output_dir = run["output_dir"]
         experiment = _experiment_label(cfg, output_dir)
         for method, payload in metrics.items():
             support = payload.get("support_metrics", {}).get("union", {})
             conn = payload.get("support_connectivity_union", {})
-            rows.append(
-                {
-                    "experiment": experiment,
-                    "output_dir": output_dir,
-                    "graph_family": cfg.get("graph_family"),
-                    "support_type": cfg.get("support_type"),
-                    "seed": cfg.get("seed"),
-                    "lambda2": cfg.get("lambda2"),
-                    "method": method,
-                    "support_f1": support.get("f1"),
-                    "support_precision": support.get("precision"),
-                    "support_recall": support.get("recall"),
-                    "graph_smoothness_norm": payload.get("graph_smoothness_norm_trueL"),
-                    "graph_smoothness_raw": payload.get("graph_smoothness_raw_trueL"),
-                    "shared_explained_variance": payload.get("shared_explained_variance"),
-                    "connect_num_components": conn.get("num_components"),
-                    "connect_largest_ratio": conn.get("largest_component_ratio"),
-                }
-            )
+            row = {
+                "experiment": experiment,
+                "output_dir": output_dir,
+                "graph_smoothness_norm": payload.get("graph_smoothness_norm_trueL"),
+                "graph_smoothness_raw": payload.get("graph_smoothness_raw_trueL"),
+                "shared_explained_variance": payload.get(
+                    "shared_explained_variance", payload.get("explained_variance")
+                ),
+                "connect_num_components": conn.get("num_components"),
+                "connect_largest_ratio": conn.get("largest_component_ratio"),
+            }
+            for field in CANONICAL_FIELDS:
+                if field == "method":
+                    row[field] = payload.get(field, method)
+                elif field in {"graph_family", "dataset"}:
+                    row[field] = payload.get(field, cfg.get(field))
+                elif field in {
+                    "support_precision",
+                    "support_recall",
+                    "support_f1",
+                }:
+                    row[field] = payload.get(field, support.get(field.split("_")[1]))
+                else:
+                    row[field] = payload.get(field, cfg.get(field))
+
+            if row["artifact_id"] is None:
+                row["artifact_id"] = artifacts.get("manifest", {}).get("artifact_id")
+
+            rows.append(row)
 
     out_path = ROOT / "results" / "metrics_summary.csv"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+        fieldnames = ["experiment", "output_dir", *CANONICAL_FIELDS, "graph_smoothness_norm", "graph_smoothness_raw", "shared_explained_variance", "connect_num_components", "connect_largest_ratio"]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
 

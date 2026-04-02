@@ -4,19 +4,21 @@ import json
 import time
 import traceback
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import yaml
 
 from .artifacts import save_json, save_metrics_csv, save_npz
 from .amanpg import AmanpgConfig, solve_amanpg
+from .datasets import load_artifact
 from .metrics import (
     explained_variance,
     graph_smoothness_norm,
     graph_smoothness_raw,
     laplacian_energy,
     match_components,
+    nnz_loadings,
     orthonormalize,
     orthogonality_error,
     sparsity_fraction,
@@ -104,6 +106,123 @@ def _pca_top_r(sigma_hat: np.ndarray, r: int) -> Tuple[np.ndarray, np.ndarray]:
     return vals, vecs
 
 
+def _run_summary(
+    history: Dict[str, np.ndarray],
+    *,
+    tol_obj: float,
+    tol_orth: float,
+    tol_gap: Optional[float] = None,
+    final_gap: Optional[float] = None,
+) -> Dict[str, Any]:
+    iterations = int(len(history["total_objective"]))
+    final_objective = float(history["total_objective"][-1]) if iterations else float("nan")
+    final_orthogonality_defect = (
+        float(history["orthogonality_error"][-1]) if iterations else float("nan")
+    )
+    if final_gap is None and "coupling_gap" in history and iterations:
+        final_gap = float(history["coupling_gap"][-1])
+    final_gap = 0.0 if final_gap is None else float(final_gap)
+
+    convergence_flag = False
+    if iterations >= 2:
+        prev_obj = float(history["total_objective"][-2])
+        rel = abs(prev_obj - final_objective) / max(1.0, abs(prev_obj))
+        gap_ok = tol_gap is None or final_gap <= tol_gap
+        convergence_flag = (
+            rel <= tol_obj
+            and gap_ok
+            and final_orthogonality_defect <= tol_orth
+        )
+
+    return {
+        "iterations": iterations,
+        "final_objective": final_objective,
+        "final_coupling_gap": final_gap,
+        "final_orthogonality_defect": final_orthogonality_defect,
+        "stop_reason": "tol_obj" if convergence_flag else "max_iters",
+        "convergence_flag": convergence_flag,
+    }
+
+
+def _canonical_method_metrics(
+    *,
+    dataset: str,
+    graph_family: str,
+    artifact_id: str,
+    artifact_version: str,
+    data_source: str,
+    prep_config_hash: str,
+    eval_protocol_id: str,
+    method: str,
+    method_version: str,
+    seed: int,
+    rank: int,
+    lambda1: float,
+    lambda2: float,
+    rho: float,
+    corruption_type: str,
+    corruption_level: float,
+    graph_used_id: str,
+    graph_reference_id: str,
+    explained_variance_value: float,
+    smoothness_used_graph: float,
+    smoothness_reference_graph: float,
+    runtime_sec: float,
+    iterations: int,
+    nnz: int,
+    sparsity_ratio_value: float,
+    final_objective: float,
+    final_coupling_gap: float,
+    final_orthogonality_defect: float,
+    stop_reason: str,
+    convergence_flag: bool,
+    support: Optional[Dict[str, float]],
+    n_samples: int,
+    n_features: int,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "dataset": dataset,
+        "graph_family": graph_family,
+        "artifact_id": artifact_id,
+        "artifact_version": artifact_version,
+        "data_source": data_source,
+        "prep_config_hash": prep_config_hash,
+        "eval_protocol_id": eval_protocol_id,
+        "method": method,
+        "method_version": method_version,
+        "seed": seed,
+        "rank": rank,
+        "lambda1": lambda1,
+        "lambda2": lambda2,
+        "rho": rho,
+        "corruption_type": corruption_type,
+        "corruption_level": corruption_level,
+        "graph_used_id": graph_used_id,
+        "graph_reference_id": graph_reference_id,
+        "explained_variance": explained_variance_value,
+        "smoothness_used_graph": smoothness_used_graph,
+        "smoothness_reference_graph": smoothness_reference_graph,
+        "runtime_sec": runtime_sec,
+        "iterations": iterations,
+        "nnz_loadings": nnz,
+        "sparsity_ratio": sparsity_ratio_value,
+        "final_objective": final_objective,
+        "final_coupling_gap": final_coupling_gap,
+        "final_orthogonality_defect": final_orthogonality_defect,
+        "stop_reason": stop_reason,
+        "convergence_flag": convergence_flag,
+        "support_precision": support.get("precision") if support else None,
+        "support_recall": support.get("recall") if support else None,
+        "support_f1": support.get("f1") if support else None,
+        "n_samples": n_samples,
+        "n_features": n_features,
+    }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
 def run(config_path: str) -> None:
     with open(config_path, "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
@@ -122,67 +241,139 @@ def run(config_path: str) -> None:
 
     dataset = None
     diagnostics = None
+    dataset_meta: Dict[str, Any] = {}
     try:
-        graph_family = cfg["graph_family"]
-        if graph_family == "chain":
-            L, _ = chain_graph_laplacian(cfg["p"])
-        elif graph_family == "sbm":
-            rng = np.random.default_rng(cfg["seed"] + 123)
-            blocks = int(cfg.get("sbm_blocks", 3))
-            p_in = float(cfg.get("sbm_p_in", 0.2))
-            p_out = float(cfg.get("sbm_p_out", 0.02))
-            block_sizes = cfg.get("sbm_block_sizes")
-            if block_sizes is not None:
-                block_sizes = [int(x) for x in block_sizes]
-            L, _ = sbm_graph_laplacian(
-                cfg["p"], blocks, p_in, p_out, rng, block_sizes=block_sizes
-            )
+        artifact_dir = cfg.get("artifact_dir")
+        if artifact_dir:
+            artifact = load_artifact(Path(artifact_dir))
+            X = artifact.X
+            L = artifact.L
+            dataset_meta = dict(artifact.metadata)
+            dataset_name = artifact.dataset
+            graph_family = artifact.graph_family
+            artifact_id = artifact.artifact_id
+            artifact_version = artifact.artifact_version
+            data_source = artifact.data_source
+            prep_config_hash = artifact.prep_config_hash
+            eval_protocol_id = artifact.eval_protocol_id
+            true_loadings = None
+            true_supports = None
         else:
-            raise ValueError("graph_family must be 'chain' or 'sbm'")
-        dataset = generate_dataset(
-            n=cfg["n"],
-            p=cfg["p"],
-            r=cfg["r"],
-            support_size=cfg["support_size"],
-            support_type=cfg["support_type"],
-            L=L,
-            snr=cfg["snr"],
-            signal_eigs=cfg.get("signal_eigs"),
-            seed=cfg["seed"],
-            decoy_count=int(cfg.get("decoy_count", 0)),
-            decoy_variance_factor=float(cfg.get("decoy_variance_factor", 0.0)),
-        )
+            graph_family = cfg["graph_family"]
+            if graph_family == "chain":
+                L, _ = chain_graph_laplacian(cfg["p"])
+            elif graph_family == "sbm":
+                rng = np.random.default_rng(cfg["seed"] + 123)
+                blocks = int(cfg.get("sbm_blocks", 3))
+                p_in = float(cfg.get("sbm_p_in", 0.2))
+                p_out = float(cfg.get("sbm_p_out", 0.02))
+                block_sizes = cfg.get("sbm_block_sizes")
+                if block_sizes is not None:
+                    block_sizes = [int(x) for x in block_sizes]
+                L, _ = sbm_graph_laplacian(
+                    cfg["p"], blocks, p_in, p_out, rng, block_sizes=block_sizes
+                )
+            else:
+                raise ValueError("graph_family must be 'chain' or 'sbm'")
+            dataset = generate_dataset(
+                n=cfg["n"],
+                p=cfg["p"],
+                r=cfg["r"],
+                support_size=cfg["support_size"],
+                support_type=cfg["support_type"],
+                L=L,
+                snr=cfg["snr"],
+                signal_eigs=cfg.get("signal_eigs"),
+                seed=cfg["seed"],
+                decoy_count=int(cfg.get("decoy_count", 0)),
+                decoy_variance_factor=float(cfg.get("decoy_variance_factor", 0.0)),
+            )
+            X = dataset.X
+            dataset_meta = dict(dataset.metadata)
+            dataset_name = "synthetic"
+            artifact_id = f"synthetic_{graph_family}"
+            artifact_version = "v1"
+            data_source = "synthetic"
+            prep_config_hash = _hash_config({k: v for k, v in cfg.items() if k != "output_dir"})
+            eval_protocol_id = "default"
+            true_loadings = dataset.true_loadings
+            true_supports = dataset.true_supports
 
-        Sigma_hat = dataset.Sigma_hat
+        Sigma_hat = dataset.Sigma_hat if dataset is not None else (X.T @ X) / int(X.shape[0])
+        n_samples = int(X.shape[0])
+        n_features = int(X.shape[1])
         eigvals, V = _pca_top_r(Sigma_hat, cfg["r"])
         A_pca = V
         B_pca = V
 
-        B_aligned_pca, perm_pca, signs_pca = _alignment(A_pca, B_pca, dataset.true_loadings)
-        support_pca = support_metrics(B_aligned_pca, dataset.true_supports)
-
-        pca_eval = {
-            "method_name": "PCA",
-            "objective_terms": objective_terms(
-                A_pca,
-                B_pca,
-                Sigma_hat,
-                L,
-                cfg["lambda1"],
-                cfg["lambda2"],
-                cfg["rho"],
-            ),
-            "explained_variance": float(np.sum(eigvals)),
-            "sparsity_fraction": sparsity_fraction(B_pca),
-            "orthogonality_error": orthogonality_error(A_pca),
-            "laplacian_energy": laplacian_energy(B_pca, L),
-            "support_metrics": support_pca,
-            "support_metrics_note": "Dense baseline diagnostics; interpret with caution.",
-            "graph_smoothness_raw_trueL": graph_smoothness_raw(B_pca, L),
-            "graph_smoothness_norm_trueL": graph_smoothness_norm(B_pca, L),
-            "shared_explained_variance": explained_variance(A_pca, Sigma_hat),
-        }
+        if true_loadings is not None and true_supports is not None:
+            B_aligned_pca, perm_pca, signs_pca = _alignment(A_pca, B_pca, true_loadings)
+            support_pca = support_metrics(B_aligned_pca, true_supports)
+        else:
+            B_aligned_pca = B_pca
+            perm_pca = np.arange(B_pca.shape[1])
+            signs_pca = np.ones(B_pca.shape[1])
+            support_pca = None
+        pca_support_union = support_pca["union"] if support_pca else None
         pca_union_mask = np.any(np.abs(B_aligned_pca) > 1e-8, axis=1)
+        pca_terms = objective_terms(
+            A_pca,
+            B_pca,
+            Sigma_hat,
+            L,
+            cfg["lambda1"],
+            cfg["lambda2"],
+            cfg["rho"],
+        )
+        pca_smoothness_raw = graph_smoothness_raw(B_pca, L)
+        pca_smoothness_norm = graph_smoothness_norm(B_pca, L)
+        pca_eval = _canonical_method_metrics(
+            dataset=dataset_name,
+            graph_family=graph_family,
+            artifact_id=artifact_id,
+            artifact_version=artifact_version,
+            data_source=data_source,
+            prep_config_hash=prep_config_hash,
+            eval_protocol_id=eval_protocol_id,
+            method="PCA",
+            method_version="v1",
+            seed=cfg["seed"],
+            rank=cfg["r"],
+            lambda1=cfg["lambda1"],
+            lambda2=cfg["lambda2"],
+            rho=cfg["rho"],
+            corruption_type=dataset_meta.get("corruption_type", "none"),
+            corruption_level=float(dataset_meta.get("corruption_level", 0.0)),
+            graph_used_id=dataset_meta.get("graph_used_id", f"{graph_family}_clean"),
+            graph_reference_id=dataset_meta.get("graph_reference_id", f"{graph_family}_clean"),
+            explained_variance_value=float(np.sum(eigvals)),
+            smoothness_used_graph=pca_smoothness_norm,
+            smoothness_reference_graph=pca_smoothness_norm,
+            runtime_sec=0.0,
+            iterations=1,
+            nnz=nnz_loadings(B_pca),
+            sparsity_ratio_value=sparsity_fraction(B_pca),
+            final_objective=float(pca_terms["total_objective"]),
+            final_coupling_gap=0.0,
+            final_orthogonality_defect=orthogonality_error(A_pca),
+            stop_reason="closed_form",
+            convergence_flag=True,
+            support=pca_support_union,
+            n_samples=n_samples,
+            n_features=n_features,
+            extra={
+                "method_name": "PCA",
+                "objective_terms": pca_terms,
+                "sparsity_fraction": sparsity_fraction(B_pca),
+                "orthogonality_error": orthogonality_error(A_pca),
+                "laplacian_energy": laplacian_energy(B_pca, L),
+                "support_metrics": support_pca,
+                "support_metrics_note": "Dense baseline diagnostics; interpret with caution.",
+                "graph_smoothness_raw_trueL": pca_smoothness_raw,
+                "graph_smoothness_norm_trueL": pca_smoothness_norm,
+                "shared_explained_variance": explained_variance(A_pca, Sigma_hat),
+            },
+        )
         pca_eval["support_connectivity_union"] = support_connectivity(pca_union_mask, L)
         metrics_out["PCA"] = pca_eval
 
@@ -197,32 +388,82 @@ def run(config_path: str) -> None:
         )
         amanpg_result = solve_amanpg(A0, Sigma_hat, amanpg_cfg)
         amanpg_B = amanpg_result.A
-        amanpg_aligned, amanpg_perm, amanpg_signs = _alignment(
-            amanpg_result.A, amanpg_B, dataset.true_loadings
+        amanpg_summary = _run_summary(
+            amanpg_result.history,
+            tol_obj=amanpg_cfg.tol_obj,
+            tol_orth=amanpg_cfg.tol_orth,
+            final_gap=0.0,
         )
-        amanpg_support = support_metrics(amanpg_aligned, dataset.true_supports)
-        amanpg_eval = {
-            "method_name": "A-ManPG",
-            "objective_terms": objective_terms(
-                amanpg_result.A,
-                amanpg_B,
-                Sigma_hat,
-                L,
-                cfg["lambda1"],
-                0.0,
-                0.0,
-            ),
-            "sparsity_fraction": sparsity_fraction(amanpg_B),
-            "orthogonality_error": orthogonality_error(amanpg_result.A),
-            "laplacian_energy": laplacian_energy(amanpg_B, L),
-            "support_metrics": amanpg_support,
-            "graph_smoothness_raw_trueL": graph_smoothness_raw(amanpg_B, L),
-            "graph_smoothness_norm_trueL": graph_smoothness_norm(amanpg_B, L),
-            "shared_explained_variance": explained_variance(
-                orthonormalize(amanpg_B), Sigma_hat
-            ),
-        }
+        if true_loadings is not None and true_supports is not None:
+            amanpg_aligned, amanpg_perm, amanpg_signs = _alignment(
+                amanpg_result.A, amanpg_B, true_loadings
+            )
+            amanpg_support = support_metrics(amanpg_aligned, true_supports)
+        else:
+            amanpg_aligned = amanpg_B
+            amanpg_perm = np.arange(amanpg_B.shape[1])
+            amanpg_signs = np.ones(amanpg_B.shape[1])
+            amanpg_support = None
+        amanpg_support_union = amanpg_support["union"] if amanpg_support else None
         amanpg_union_mask = np.any(np.abs(amanpg_aligned) > 1e-8, axis=1)
+        amanpg_smoothness_raw = graph_smoothness_raw(amanpg_B, L)
+        amanpg_smoothness_norm = graph_smoothness_norm(amanpg_B, L)
+        amanpg_eval = _canonical_method_metrics(
+            dataset=dataset_name,
+            graph_family=graph_family,
+            artifact_id=artifact_id,
+            artifact_version=artifact_version,
+            data_source=data_source,
+            prep_config_hash=prep_config_hash,
+            eval_protocol_id=eval_protocol_id,
+            method="A-ManPG",
+            method_version="v1",
+            seed=cfg["seed"],
+            rank=cfg["r"],
+            lambda1=cfg["lambda1"],
+            lambda2=0.0,
+            rho=0.0,
+            corruption_type=dataset_meta.get("corruption_type", "none"),
+            corruption_level=float(dataset_meta.get("corruption_level", 0.0)),
+            graph_used_id=dataset_meta.get("graph_used_id", f"{graph_family}_clean"),
+            graph_reference_id=dataset_meta.get("graph_reference_id", f"{graph_family}_clean"),
+            explained_variance_value=explained_variance(orthonormalize(amanpg_B), Sigma_hat),
+            smoothness_used_graph=amanpg_smoothness_norm,
+            smoothness_reference_graph=amanpg_smoothness_norm,
+            runtime_sec=0.0,
+            iterations=int(len(amanpg_result.history["total_objective"])),
+            nnz=nnz_loadings(amanpg_B),
+            sparsity_ratio_value=sparsity_fraction(amanpg_B),
+            final_objective=float(amanpg_summary["final_objective"]),
+            final_coupling_gap=float(amanpg_summary["final_coupling_gap"]),
+            final_orthogonality_defect=float(amanpg_summary["final_orthogonality_defect"]),
+            stop_reason=amanpg_summary["stop_reason"],
+            convergence_flag=amanpg_summary["convergence_flag"],
+            support=amanpg_support_union,
+            n_samples=n_samples,
+            n_features=n_features,
+            extra={
+                "method_name": "A-ManPG",
+                "objective_terms": objective_terms(
+                    amanpg_result.A,
+                    amanpg_B,
+                    Sigma_hat,
+                    L,
+                    cfg["lambda1"],
+                    0.0,
+                    0.0,
+                ),
+                "sparsity_fraction": sparsity_fraction(amanpg_B),
+                "orthogonality_error": orthogonality_error(amanpg_result.A),
+                "laplacian_energy": laplacian_energy(amanpg_B, L),
+                "support_metrics": amanpg_support,
+                "graph_smoothness_raw_trueL": amanpg_smoothness_raw,
+                "graph_smoothness_norm_trueL": amanpg_smoothness_norm,
+                "shared_explained_variance": explained_variance(
+                    orthonormalize(amanpg_B), Sigma_hat
+                ),
+            },
+        )
         amanpg_eval["support_connectivity_union"] = support_connectivity(
             amanpg_union_mask, L
         )
@@ -239,9 +480,84 @@ def run(config_path: str) -> None:
             tol_orth=cfg["tol_orth"],
         )
         result = solve(A0, B0, Sigma_hat, L, solver_cfg)
-
-        B_aligned, perm, signs = _alignment(result.A, result.B, dataset.true_loadings)
-        support = support_metrics(B_aligned, dataset.true_supports)
+        solver_summary = _run_summary(
+            result.history,
+            tol_obj=solver_cfg.tol_obj,
+            tol_orth=solver_cfg.tol_orth,
+            tol_gap=solver_cfg.tol_gap,
+        )
+        if true_loadings is not None and true_supports is not None:
+            B_aligned, perm, signs = _alignment(result.A, result.B, true_loadings)
+            support = support_metrics(B_aligned, true_supports)
+        else:
+            B_aligned = result.B
+            perm = np.arange(result.B.shape[1])
+            signs = np.ones(result.B.shape[1])
+            support = None
+        support_union = support["union"] if support else None
+        proposed_union_mask = np.any(np.abs(B_aligned) > 1e-8, axis=1)
+        proposed_smoothness_raw = graph_smoothness_raw(result.B, L)
+        proposed_smoothness_norm = graph_smoothness_norm(result.B, L)
+        proposed_eval = _canonical_method_metrics(
+            dataset=dataset_name,
+            graph_family=graph_family,
+            artifact_id=artifact_id,
+            artifact_version=artifact_version,
+            data_source=data_source,
+            prep_config_hash=prep_config_hash,
+            eval_protocol_id=eval_protocol_id,
+            method="Proposed",
+            method_version="v1",
+            seed=cfg["seed"],
+            rank=cfg["r"],
+            lambda1=cfg["lambda1"],
+            lambda2=cfg["lambda2"],
+            rho=cfg["rho"],
+            corruption_type=dataset_meta.get("corruption_type", "none"),
+            corruption_level=float(dataset_meta.get("corruption_level", 0.0)),
+            graph_used_id=dataset_meta.get("graph_used_id", f"{graph_family}_clean"),
+            graph_reference_id=dataset_meta.get("graph_reference_id", f"{graph_family}_clean"),
+            explained_variance_value=explained_variance(orthonormalize(result.B), Sigma_hat),
+            smoothness_used_graph=proposed_smoothness_norm,
+            smoothness_reference_graph=proposed_smoothness_norm,
+            runtime_sec=0.0,
+            iterations=solver_summary["iterations"],
+            nnz=nnz_loadings(result.B),
+            sparsity_ratio_value=sparsity_fraction(result.B),
+            final_objective=float(solver_summary["final_objective"]),
+            final_coupling_gap=float(solver_summary["final_coupling_gap"]),
+            final_orthogonality_defect=float(solver_summary["final_orthogonality_defect"]),
+            stop_reason=solver_summary["stop_reason"],
+            convergence_flag=solver_summary["convergence_flag"],
+            support=support_union,
+            n_samples=n_samples,
+            n_features=n_features,
+            extra={
+                "method_name": "Proposed",
+                "objective_terms": objective_terms(
+                    result.A,
+                    result.B,
+                    Sigma_hat,
+                    L,
+                    cfg["lambda1"],
+                    cfg["lambda2"],
+                    cfg["rho"],
+                ),
+                "sparsity_fraction": sparsity_fraction(result.B),
+                "orthogonality_error": orthogonality_error(result.A),
+                "laplacian_energy": laplacian_energy(result.B, L),
+                "support_metrics": support,
+                "graph_smoothness_raw_trueL": proposed_smoothness_raw,
+                "graph_smoothness_norm_trueL": proposed_smoothness_norm,
+                "shared_explained_variance": explained_variance(
+                    orthonormalize(result.B), Sigma_hat
+                ),
+            },
+        )
+        proposed_eval["support_connectivity_union"] = support_connectivity(
+            proposed_union_mask, L
+        )
+        metrics_out["Proposed"] = proposed_eval
 
         # Sparse PCA baseline (no graph regularization)
         L_zero = np.zeros_like(L)
@@ -256,60 +572,84 @@ def run(config_path: str) -> None:
             tol_orth=cfg["tol_orth"],
         )
         spca_result = solve(A0, B0, Sigma_hat, L_zero, spca_cfg)
-        spca_aligned, spca_perm, spca_signs = _alignment(
-            spca_result.A, spca_result.B, dataset.true_loadings
+        spca_summary = _run_summary(
+            spca_result.history,
+            tol_obj=spca_cfg.tol_obj,
+            tol_orth=spca_cfg.tol_orth,
+            tol_gap=spca_cfg.tol_gap,
         )
-        spca_support = support_metrics(spca_aligned, dataset.true_supports)
-
-        proposed_eval = {
-            "method_name": "Proposed",
-            "objective_terms": objective_terms(
-                result.A,
-                result.B,
-                Sigma_hat,
-                L,
-                cfg["lambda1"],
-                cfg["lambda2"],
-                cfg["rho"],
-            ),
-            "sparsity_fraction": sparsity_fraction(result.B),
-            "orthogonality_error": orthogonality_error(result.A),
-            "laplacian_energy": laplacian_energy(result.B, L),
-            "support_metrics": support,
-            "graph_smoothness_raw_trueL": graph_smoothness_raw(result.B, L),
-            "graph_smoothness_norm_trueL": graph_smoothness_norm(result.B, L),
-            "shared_explained_variance": explained_variance(
-                orthonormalize(result.B), Sigma_hat
-            ),
-        }
-        proposed_union_mask = np.any(np.abs(B_aligned) > 1e-8, axis=1)
-        proposed_eval["support_connectivity_union"] = support_connectivity(
-            proposed_union_mask, L
-        )
-        metrics_out["Proposed"] = proposed_eval
-
-        spca_eval = {
-            "method_name": "SparseNoGraph",
-            "objective_terms": objective_terms(
-                spca_result.A,
-                spca_result.B,
-                Sigma_hat,
-                L_zero,
-                cfg["lambda1"],
-                0.0,
-                cfg["rho"],
-            ),
-            "sparsity_fraction": sparsity_fraction(spca_result.B),
-            "orthogonality_error": orthogonality_error(spca_result.A),
-            "laplacian_energy": laplacian_energy(spca_result.B, L_zero),
-            "support_metrics": spca_support,
-            "graph_smoothness_raw_trueL": graph_smoothness_raw(spca_result.B, L),
-            "graph_smoothness_norm_trueL": graph_smoothness_norm(spca_result.B, L),
-            "shared_explained_variance": explained_variance(
+        if true_loadings is not None and true_supports is not None:
+            spca_aligned, spca_perm, spca_signs = _alignment(
+                spca_result.A, spca_result.B, true_loadings
+            )
+            spca_support = support_metrics(spca_aligned, true_supports)
+        else:
+            spca_aligned = spca_result.B
+            spca_perm = np.arange(spca_result.B.shape[1])
+            spca_signs = np.ones(spca_result.B.shape[1])
+            spca_support = None
+        spca_support_union = spca_support["union"] if spca_support else None
+        spca_union_mask = np.any(np.abs(spca_aligned) > 1e-8, axis=1)
+        spca_smoothness_raw = graph_smoothness_raw(spca_result.B, L)
+        spca_smoothness_norm = graph_smoothness_norm(spca_result.B, L)
+        spca_eval = _canonical_method_metrics(
+            dataset=dataset_name,
+            graph_family=graph_family,
+            artifact_id=artifact_id,
+            artifact_version=artifact_version,
+            data_source=data_source,
+            prep_config_hash=prep_config_hash,
+            eval_protocol_id=eval_protocol_id,
+            method="SparseNoGraph",
+            method_version="v1",
+            seed=cfg["seed"],
+            rank=cfg["r"],
+            lambda1=cfg["lambda1"],
+            lambda2=0.0,
+            rho=cfg["rho"],
+            corruption_type=dataset_meta.get("corruption_type", "none"),
+            corruption_level=float(dataset_meta.get("corruption_level", 0.0)),
+            graph_used_id=dataset_meta.get("graph_used_id", f"{graph_family}_clean"),
+            graph_reference_id=dataset_meta.get("graph_reference_id", f"{graph_family}_clean"),
+            explained_variance_value=explained_variance(
                 orthonormalize(spca_result.B), Sigma_hat
             ),
-        }
-        spca_union_mask = np.any(np.abs(spca_aligned) > 1e-8, axis=1)
+            smoothness_used_graph=spca_smoothness_norm,
+            smoothness_reference_graph=spca_smoothness_norm,
+            runtime_sec=0.0,
+            iterations=spca_summary["iterations"],
+            nnz=nnz_loadings(spca_result.B),
+            sparsity_ratio_value=sparsity_fraction(spca_result.B),
+            final_objective=float(spca_summary["final_objective"]),
+            final_coupling_gap=float(spca_summary["final_coupling_gap"]),
+            final_orthogonality_defect=float(spca_summary["final_orthogonality_defect"]),
+            stop_reason=spca_summary["stop_reason"],
+            convergence_flag=spca_summary["convergence_flag"],
+            support=spca_support_union,
+            n_samples=n_samples,
+            n_features=n_features,
+            extra={
+                "method_name": "SparseNoGraph",
+                "objective_terms": objective_terms(
+                    spca_result.A,
+                    spca_result.B,
+                    Sigma_hat,
+                    L_zero,
+                    cfg["lambda1"],
+                    0.0,
+                    cfg["rho"],
+                ),
+                "sparsity_fraction": sparsity_fraction(spca_result.B),
+                "orthogonality_error": orthogonality_error(spca_result.A),
+                "laplacian_energy": laplacian_energy(spca_result.B, L_zero),
+                "support_metrics": spca_support,
+                "graph_smoothness_raw_trueL": spca_smoothness_raw,
+                "graph_smoothness_norm_trueL": spca_smoothness_norm,
+                "shared_explained_variance": explained_variance(
+                    orthonormalize(spca_result.B), Sigma_hat
+                ),
+            },
+        )
         spca_eval["support_connectivity_union"] = support_connectivity(
             spca_union_mask, L
         )
@@ -327,11 +667,8 @@ def run(config_path: str) -> None:
             "amanpg_matching_signs": amanpg_signs,
             "pca_A": A_pca,
             "pca_B": B_pca,
-            "Sigma_true": dataset.Sigma_true,
-            "Sigma_hat": dataset.Sigma_hat,
-            "L": dataset.L,
-            "true_loadings": dataset.true_loadings,
-            "true_support": np.array(dataset.true_supports, dtype=object),
+            "Sigma_hat": Sigma_hat,
+            "L": L,
             "matching_perm": perm,
             "matching_signs": signs,
             "pca_matching_perm": perm_pca,
@@ -339,6 +676,16 @@ def run(config_path: str) -> None:
             **{f"amanpg_history_{k}": v for k, v in amanpg_result.history.items()},
             **{f"history_{k}": v for k, v in history_arrays.items()},
         }
+        if dataset is not None:
+            arrays.update(
+                {
+                    "Sigma_true": dataset.Sigma_true,
+                    "true_loadings": dataset.true_loadings,
+                    "true_support": np.array(dataset.true_supports, dtype=object),
+                }
+            )
+        else:
+            arrays["X"] = X
 
         _write_convergence_plots(output_dir / "plots", history_arrays)
 
@@ -349,6 +696,9 @@ def run(config_path: str) -> None:
 
     end_time = time.time()
     runtime = end_time - start_time
+
+    for payload in metrics_out.values():
+        payload["runtime_sec"] = runtime
 
     manifest = {
         "status": status,
@@ -368,7 +718,7 @@ def run(config_path: str) -> None:
         "failure_reason": failure_reason,
         "manifest": manifest,
         "config": cfg,
-        "dataset_metadata": dataset.metadata if dataset is not None else None,
+        "dataset_metadata": dataset_meta,
         "baseline_placeholder_note": "PCA artifacts use B=V for schema compatibility.",
         "diagnostics": diagnostics,
     }
@@ -384,7 +734,6 @@ def run(config_path: str) -> None:
 
     if status != "success":
         raise SystemExit(1)
-
 
 def _git_hash() -> Optional[str]:
     import subprocess
