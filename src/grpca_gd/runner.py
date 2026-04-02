@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import time
 import traceback
+import warnings
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import yaml
@@ -274,6 +275,7 @@ def run(config_path: str) -> None:
     history_arrays = {}
     arrays = {}
     metrics_out: Dict[str, Any] = {}
+    warning_messages: List[str] = []
 
     dataset = None
     diagnostics = None
@@ -377,7 +379,17 @@ def run(config_path: str) -> None:
             true_loadings = dataset.true_loadings
             true_supports = dataset.true_supports
 
-        Sigma_hat = dataset.Sigma_hat if dataset is not None else (X.T @ X) / int(X.shape[0])
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always", RuntimeWarning)
+            Sigma_hat = (
+                dataset.Sigma_hat
+                if dataset is not None
+                else (X.T @ X) / int(X.shape[0])
+            )
+            for item in w:
+                warning_messages.append(str(item.message))
+        if not np.isfinite(Sigma_hat).all():
+            warning_messages.append("Sigma_hat contains non-finite values.")
         n_samples = int(X.shape[0])
         n_features = int(X.shape[1])
         eigvals, V = _pca_top_r(Sigma_hat, cfg["r"])
@@ -394,15 +406,19 @@ def run(config_path: str) -> None:
             support_pca = None
         pca_support_union = support_pca["union"] if support_pca else None
         pca_union_mask = np.any(np.abs(B_aligned_pca) > 1e-8, axis=1)
-        pca_terms = objective_terms(
-            A_pca,
-            B_pca,
-            Sigma_hat,
-            L,
-            cfg["lambda1"],
-            cfg["lambda2"],
-            cfg["rho"],
-        )
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always", RuntimeWarning)
+            pca_terms = objective_terms(
+                A_pca,
+                B_pca,
+                Sigma_hat,
+                L,
+                cfg["lambda1"],
+                cfg["lambda2"],
+                cfg["rho"],
+            )
+            for item in w:
+                warning_messages.append(str(item.message))
         pca_smoothness_raw = graph_smoothness_raw(B_pca, L)
         pca_smoothness_norm = graph_smoothness_norm(B_pca, L)
         pca_eval = _canonical_method_metrics(
@@ -464,7 +480,13 @@ def run(config_path: str) -> None:
             tol_obj=cfg["tol_obj"],
             tol_orth=cfg["tol_orth"],
         )
-        amanpg_result = solve_amanpg(A0, Sigma_hat, amanpg_cfg)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always", RuntimeWarning)
+            amanpg_result = solve_amanpg(A0, Sigma_hat, amanpg_cfg)
+            for item in w:
+                warning_messages.append(str(item.message))
+        if not np.isfinite(amanpg_result.A).all():
+            warning_messages.append("A-ManPG produced non-finite loadings.")
         amanpg_B = amanpg_result.A
         amanpg_summary = _run_summary(
             amanpg_result.history,
@@ -557,7 +579,13 @@ def run(config_path: str) -> None:
             tol_gap=cfg["tol_gap"],
             tol_orth=cfg["tol_orth"],
         )
-        result = solve(A0, B0, Sigma_hat, L, solver_cfg)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always", RuntimeWarning)
+            result = solve(A0, B0, Sigma_hat, L, solver_cfg)
+            for item in w:
+                warning_messages.append(str(item.message))
+        if not np.isfinite(result.B).all():
+            warning_messages.append("Proposed solver produced non-finite loadings.")
         solver_summary = _run_summary(
             result.history,
             tol_obj=solver_cfg.tol_obj,
@@ -652,7 +680,13 @@ def run(config_path: str) -> None:
             tol_gap=cfg["tol_gap"],
             tol_orth=cfg["tol_orth"],
         )
-        graph_only_result = solve(A0, A0, Sigma_hat, L, graph_only_cfg)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always", RuntimeWarning)
+            graph_only_result = solve(A0, A0, Sigma_hat, L, graph_only_cfg)
+            for item in w:
+                warning_messages.append(str(item.message))
+        if not np.isfinite(graph_only_result.B).all():
+            warning_messages.append("GraphOnlyPCA produced non-finite loadings.")
         graph_only_summary = _run_summary(
             graph_only_result.history,
             tol_obj=graph_only_cfg.tol_obj,
@@ -746,7 +780,12 @@ def run(config_path: str) -> None:
                 max_iters=cfg["max_iters"],
                 tol_obj=cfg["tol_obj"],
             )
-            return solve_graph_sparse(B0, Sigma_hat, L, cfg_local)
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always", RuntimeWarning)
+                out = solve_graph_sparse(B0, Sigma_hat, L, cfg_local)
+                for item in w:
+                    warning_messages.append(str(item.message))
+            return out
 
         graph_sparse_lambda1, graph_sparse_result, graph_sparse_nnz = _match_lambda1(
             target_nnz, lambda1_candidates, _run_graph_sparse
@@ -863,7 +902,12 @@ def run(config_path: str) -> None:
                 tol_orth=cfg["tol_orth"],
             )
             B0_local = soft_threshold(A0, lam / max(cfg["rho"], 1e-8))
-            return solve(A0, B0_local, Sigma_hat, L_zero, spca_cfg_local)
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always", RuntimeWarning)
+                out = solve(A0, B0_local, Sigma_hat, L_zero, spca_cfg_local)
+                for item in w:
+                    warning_messages.append(str(item.message))
+            return out
 
         spca_lambda1, spca_result, spca_nnz = _match_lambda1(
             target_nnz, lambda1_candidates, _run_spca
@@ -1017,6 +1061,7 @@ def run(config_path: str) -> None:
         "dataset_hash": _hash_array(dataset.Sigma_true) if dataset is not None else None,
         "git_hash": _git_hash(),
         "tuning_note": "Defaults rho=5.0 and eta_A=0.05 selected for improved coupling behavior on r=1 and r=3 smoke runs without harming recovery.",
+        "runtime_warnings": sorted(set(warning_messages)),
         **_env_info(),
     }
 
