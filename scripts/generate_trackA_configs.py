@@ -38,7 +38,7 @@ def generate_sweeps(
     seeds: List[int],
     lambda2_grid: List[float],
 ) -> None:
-    for graph_family in ("sbm", "chain"):
+    for graph_family in ("sbm", "chain", "grid", "knn"):
         for seed in seeds:
             for lambda2 in lambda2_grid:
                 cfg = _base_config()
@@ -50,6 +50,20 @@ def generate_sweeps(
                         "support_type": "connected",
                     }
                 )
+                if graph_family == "grid":
+                    cfg.update(
+                        {
+                            "grid_rows": 20,
+                            "grid_cols": 10,
+                        }
+                    )
+                if graph_family == "knn":
+                    cfg.update(
+                        {
+                            "knn_k": 5,
+                            "knn_dim": 2,
+                        }
+                    )
                 if graph_family == "sbm":
                     cfg.update(
                         {

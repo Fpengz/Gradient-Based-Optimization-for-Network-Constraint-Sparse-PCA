@@ -74,8 +74,10 @@ def _plot_family(df: pd.DataFrame, graph_family: str, out_name: str) -> None:
 
 def main() -> None:
     df = pd.read_csv(SUMMARY)
-    _plot_family(df, "sbm", "sbm_lambda2_sweep_panel.png")
     _plot_family(df, "chain", "chain_lambda2_sweep_panel.png")
+    _plot_family(df, "grid", "grid_lambda2_sweep_panel.png")
+    _plot_family(df, "sbm", "sbm_lambda2_sweep_panel.png")
+    _plot_family(df, "knn", "knn_lambda2_sweep_panel.png")
 
 
 if __name__ == "__main__":
