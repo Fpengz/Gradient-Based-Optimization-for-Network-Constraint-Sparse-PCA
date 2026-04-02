@@ -64,11 +64,7 @@ def _env_info() -> Dict[str, Any]:
 def _validate_config(cfg: Dict[str, Any]) -> None:
     required = [
         "seed",
-        "n",
-        "p",
         "r",
-        "support_size",
-        "snr",
         "lambda1",
         "lambda2",
         "rho",
@@ -77,11 +73,20 @@ def _validate_config(cfg: Dict[str, Any]) -> None:
         "tol_gap",
         "tol_orth",
         "eta_A",
-        "graph_family",
-        "support_type",
         "baseline",
         "output_dir",
     ]
+    if not cfg.get("artifact_dir"):
+        required.extend(
+            [
+                "n",
+                "p",
+                "support_size",
+                "snr",
+                "graph_family",
+                "support_type",
+            ]
+        )
     missing = [k for k in required if k not in cfg]
     if missing:
         raise ValueError(f"Missing config fields: {missing}")

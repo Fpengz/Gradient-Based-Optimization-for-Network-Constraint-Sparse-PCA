@@ -124,3 +124,25 @@ def test_collect_metrics_emits_canonical_columns(tmp_path: Path, monkeypatch) ->
     assert row["dataset"] == "synthetic"
     assert row["artifact_id"] == "synthetic_chain"
     assert row["nnz_loadings"] == "4"
+
+
+def test_validate_config_allows_artifact_runs_without_synthetic_fields() -> None:
+    from src.grpca_gd.runner import _validate_config
+
+    cfg = {
+        "seed": 0,
+        "r": 2,
+        "lambda1": 0.1,
+        "lambda2": 0.2,
+        "rho": 5.0,
+        "max_iters": 10,
+        "tol_obj": 1e-6,
+        "tol_gap": 1e-6,
+        "tol_orth": 1e-6,
+        "eta_A": 0.05,
+        "baseline": "PCA",
+        "output_dir": "outputs/run",
+        "artifact_dir": "artifacts/run",
+    }
+
+    _validate_config(cfg)
