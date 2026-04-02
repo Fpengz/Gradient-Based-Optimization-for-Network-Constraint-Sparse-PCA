@@ -47,3 +47,6 @@ git -C /Users/zhoufuwang/Projects/GRPCA-GD worktree list
 - Only use the main repo (`/Users/zhoufuwang/Projects/GRPCA-GD`) for reference.  
 - **Active Track A Phase 2 worktree:**  
   `/Users/zhoufuwang/Projects/GRPCA-GD/.worktrees/paper-trackA-phase2-final`
+- **Track B Phase 1.5:**  
+  `paper-trackB-phase1.5-claim-hardening` is a superset of `paper-trackB-phase1.5-submission`.  
+  Keep the submission tag as the frozen snapshot; use claim-hardening for ongoing edits.
