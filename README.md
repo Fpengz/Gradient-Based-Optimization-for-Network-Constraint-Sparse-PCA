@@ -20,6 +20,11 @@ Naming convention (must be adhered to for both branch and folder names):
 If you are working on Track A Phase 2, always use:
 `/Users/zhoufuwang/Projects/GRPCA-GD/.worktrees/paper-trackA-phase2-final`
 
+## Docs Index
+- `docs/worktrees.md` — worktree naming rules and lifecycle commands (required reading)
+- `docs/phase2-changelog.md` — Phase 2 changes, figures, and warning policy
+- `docs/phase1.5-claim-hardening-realdata-changelog.md` — Phase 1.5 changes
+
 ## Methods Compared (Paper-1)
 - PCA (dense baseline)
 - Minimal A-ManPG (external sparse orthogonal baseline, no graph)
