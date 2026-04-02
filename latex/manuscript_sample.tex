@@ -66,7 +66,7 @@
 % Abstract
 % =========================
 \begin{abstract}
-We study sparse, graph-smooth, explicitly orthogonal multi-component PCA through a split-variable formulation that couples an orthogonal loading matrix with a sparse graph-regularized proxy. We propose a concrete alternating solver consisting of a Stiefel manifold update for the orthogonal factor and a proximal-gradient update for the sparse graph-smooth factor. We evaluate the method on synthetic graph families using shared evaluation metrics (support recovery, graph smoothness on the true graph, and shared explained variance). In our synthetic experiments, graph regularization yields smoother solutions on the true graph, while its effect on support recovery is topology-dependent: on chain graphs the method is competitive on recovery and smoother on the true graph, whereas on SBM graphs stronger regularization induces a recovery–smoothness tradeoff and light regularization can improve smoothness with limited recovery loss. We also include a graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, where moderate graph regularization preserves recovery while improving structural connectivity and smoothness. The study is synthetic-first and limited to chain and SBM topologies; broader theoretical guarantees and real-data validation remain future work.
+We study sparse, graph-smooth, explicitly orthogonal multi-component PCA through a split-variable formulation that couples an orthogonal loading matrix with a sparse graph-regularized proxy. Rather than proposing new optimization primitives, we use this formulation as a controlled testbed to characterize when graph regularization helps or hurts under misspecification. Experiments spanning chain, grid, SBM, ER, kNN, and small-world graphs show a regime-based pattern: weak regularization is robust across topologies, while stronger regularization can amplify misspecification on fragile graphs. Real-data studies on TCGA-BRCA, MNIST (grid), and S\&P500 correlation graphs show aligned trends. Our contribution is thus an empirical characterization of topology- and regime-dependent behavior rather than a universal performance gain.
 \end{abstract}
 
 \section{Introduction}
@@ -181,6 +181,15 @@ The coupling term $\frac{\rho}{2}\|A-B\|_F^2$ is a fixed-$\rho$ quadratic penalt
 Directly optimizing a sparse graph-regularized objective under orthogonality constraints is difficult because the orthogonality constraint is nonconvex while the graph-sparsity regularizer is nonsmooth and coupled across features. The split formulation isolates these effects: $A$ is updated on the Stiefel manifold, while $B$ is updated in Euclidean space under structured regularization.
 
 We leave alternative sparsity structures to future work to keep the formulation fixed to entrywise $\ell_1$ on $B$.
+
+\paragraph{Estimator choice.}
+We treat $B$ as the primary estimator for sparsity and smoothness metrics, since it carries the graph-regularized structure. Variance is reported using $A$ (or $\mathrm{QR}(B)$ when needed) to ensure orthogonality.
+
+\paragraph{Limiting cases.}
+When $\lambda_2=0$, the formulation reduces to sparse PCA without graph smoothness; when $\lambda_1=0$, it reduces to graph-regularized PCA; and as $\rho\to\infty$, the split formulation converges to a single constrained problem with $A=B$.
+
+\paragraph{Laplacian normalization.}
+We use the normalized Laplacian $L=I-D^{-1/2}WD^{-1/2}$ throughout, so $\lambda_2$ is comparable across graphs with different degrees.
 
 \section{Optimization Algorithm}
 \label{sec:algorithm}
@@ -411,6 +420,9 @@ These experiments establish a focused empirical message: in our synthetic experi
 The chain setting aligns naturally with local smoothness, whereas the SBM setting emphasizes block/community structure; as a result, the same smoothness penalty can act as a mild regularizer in one topology and as an oversmoothing force in another. The $\lambda_2$ sweep on SBM makes this explicit: mild regularization yields smoother solutions with limited recovery loss, whereas stronger regularization oversmooths and reduces recovery. These observations imply that $\lambda_2$ must be tuned with respect to graph topology rather than assumed to be universally beneficial.
 
 The main limitation of the current evidence is that it remains synthetic and focuses on two graph families with a single data generator. This is appropriate for a focused empirical study, whose goal is to establish a disciplined method and a clear empirical tradeoff. The results demonstrate that structural priors can improve graph coherence, but they also show that regularization strength must be tuned to topology. If the graph-aligned setting fails to preserve recovery, the correct conclusion is a tradeoff characterization rather than a recovery-improving claim.
+
+\paragraph{Threats to validity.}
+Despite expanded graph families, our experiments still cover a limited subset of possible topologies. The S\&P500 correlation graph is a noisy proxy for true relationships, and real data lacks ground-truth supports. Implementations share a common NumPy codebase and are not equivalently optimized, so runtime comparisons are indicative only. Finally, hyperparameter tuning choices can influence regime boundaries.
 
 \section{Conclusion}
 \label{sec:conclusion}
