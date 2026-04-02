@@ -26,7 +26,7 @@ from .metrics import (
     support_metrics,
 )
 from .objective import objective_terms
-from .solver import SolverConfig, solve, soft_threshold
+from .solver import GraphSparseConfig, solve_graph_sparse, SolverConfig, solve, soft_threshold
 from .synthetic.data import generate_dataset
 from .synthetic.graphs import (
     chain_graph_laplacian,
@@ -233,6 +233,30 @@ def _canonical_method_metrics(
     if extra:
         payload.update(extra)
     return payload
+
+
+def _lambda1_candidates(base: float) -> List[float]:
+    grid = [base * scale for scale in (0.25, 0.5, 1.0, 2.0, 4.0)]
+    return sorted({max(1e-8, float(x)) for x in grid})
+
+
+def _match_lambda1(
+    target_nnz: int,
+    candidates: List[float],
+    run_fn,
+) -> Tuple[float, Any, int]:
+    best = None
+    best_score = None
+    for lam in candidates:
+        result = run_fn(lam)
+        nnz = nnz_loadings(result.B)
+        score = abs(nnz - target_nnz)
+        if best_score is None or score < best_score:
+            best_score = score
+            best = (lam, result, nnz)
+    if best is None:
+        raise RuntimeError("Failed to match lambda1 candidates")
+    return best
 
 
 def run(config_path: str) -> None:
@@ -614,11 +638,238 @@ def run(config_path: str) -> None:
             proposed_union_mask, L
         )
         metrics_out["Proposed"] = proposed_eval
+        target_nnz = nnz_loadings(result.B)
+        lambda1_candidates = _lambda1_candidates(cfg["lambda1"])
+
+        # Graph-only PCA baseline (lambda1=0)
+        graph_only_cfg = SolverConfig(
+            lambda1=0.0,
+            lambda2=cfg["lambda2"],
+            rho=cfg["rho"],
+            eta_A=cfg["eta_A"],
+            max_iters=cfg["max_iters"],
+            tol_obj=cfg["tol_obj"],
+            tol_gap=cfg["tol_gap"],
+            tol_orth=cfg["tol_orth"],
+        )
+        graph_only_result = solve(A0, A0, Sigma_hat, L, graph_only_cfg)
+        graph_only_summary = _run_summary(
+            graph_only_result.history,
+            tol_obj=graph_only_cfg.tol_obj,
+            tol_orth=graph_only_cfg.tol_orth,
+            tol_gap=graph_only_cfg.tol_gap,
+        )
+        if true_loadings is not None and true_supports is not None:
+            graph_only_aligned, graph_only_perm, graph_only_signs = _alignment(
+                graph_only_result.A, graph_only_result.B, true_loadings
+            )
+            graph_only_support = support_metrics(graph_only_aligned, true_supports)
+        else:
+            graph_only_aligned = graph_only_result.B
+            graph_only_perm = np.arange(graph_only_result.B.shape[1])
+            graph_only_signs = np.ones(graph_only_result.B.shape[1])
+            graph_only_support = None
+        graph_only_support_union = graph_only_support["union"] if graph_only_support else None
+        graph_only_union_mask = np.any(np.abs(graph_only_aligned) > 1e-8, axis=1)
+        graph_only_smoothness_raw = graph_smoothness_raw(graph_only_result.B, L)
+        graph_only_smoothness_norm = graph_smoothness_norm(graph_only_result.B, L)
+        graph_only_smoothness_ref = graph_smoothness_norm(graph_only_result.B, smooth_L_ref)
+        graph_only_eval = _canonical_method_metrics(
+            dataset=dataset_name,
+            graph_family=graph_family,
+            artifact_id=artifact_id,
+            artifact_version=artifact_version,
+            data_source=data_source,
+            prep_config_hash=prep_config_hash,
+            eval_protocol_id=eval_protocol_id,
+            method="GraphOnlyPCA",
+            method_version="v1",
+            seed=cfg["seed"],
+            rank=cfg["r"],
+            lambda1=0.0,
+            lambda2=cfg["lambda2"],
+            rho=cfg["rho"],
+            corruption_type=dataset_meta.get("corruption_type", "none"),
+            corruption_level=float(dataset_meta.get("corruption_level", 0.0)),
+            graph_used_id=dataset_meta.get("graph_used_id", f"{graph_family}_clean"),
+            graph_reference_id=dataset_meta.get("graph_reference_id", f"{graph_family}_clean"),
+            explained_variance_value=explained_variance(
+                orthonormalize(graph_only_result.B), Sigma_hat
+            ),
+            smoothness_used_graph=graph_only_smoothness_norm,
+            smoothness_reference_graph=graph_only_smoothness_ref,
+            runtime_sec=0.0,
+            iterations=graph_only_summary["iterations"],
+            nnz=nnz_loadings(graph_only_result.B),
+            sparsity_ratio_value=sparsity_fraction(graph_only_result.B),
+            final_objective=float(graph_only_summary["final_objective"]),
+            final_coupling_gap=float(graph_only_summary["final_coupling_gap"]),
+            final_orthogonality_defect=float(graph_only_summary["final_orthogonality_defect"]),
+            stop_reason=graph_only_summary["stop_reason"],
+            convergence_flag=graph_only_summary["convergence_flag"],
+            support=graph_only_support_union,
+            n_samples=n_samples,
+            n_features=n_features,
+            extra={
+                "method_name": "GraphOnlyPCA",
+                "objective_terms": objective_terms(
+                    graph_only_result.A,
+                    graph_only_result.B,
+                    Sigma_hat,
+                    L,
+                    0.0,
+                    cfg["lambda2"],
+                    cfg["rho"],
+                ),
+                "sparsity_fraction": sparsity_fraction(graph_only_result.B),
+                "orthogonality_error": orthogonality_error(graph_only_result.A),
+                "laplacian_energy": laplacian_energy(graph_only_result.B, L),
+                "support_metrics": graph_only_support,
+                "support_metrics_note": "Dense graph-only baseline; interpret support metrics with caution.",
+                "graph_smoothness_raw_trueL": graph_only_smoothness_raw,
+                "graph_smoothness_norm_trueL": graph_only_smoothness_norm,
+                "shared_explained_variance": explained_variance(
+                    orthonormalize(graph_only_result.B), Sigma_hat
+                ),
+            },
+        )
+        graph_only_eval["support_connectivity_union"] = support_connectivity(
+            graph_only_union_mask, L
+        )
+        metrics_out["GraphOnlyPCA"] = graph_only_eval
+
+        # Graph + sparsity baseline without orthogonality (non-manifold)
+        def _run_graph_sparse(lam: float):
+            cfg_local = GraphSparseConfig(
+                lambda1=lam,
+                lambda2=cfg["lambda2"],
+                max_iters=cfg["max_iters"],
+                tol_obj=cfg["tol_obj"],
+            )
+            return solve_graph_sparse(B0, Sigma_hat, L, cfg_local)
+
+        graph_sparse_lambda1, graph_sparse_result, graph_sparse_nnz = _match_lambda1(
+            target_nnz, lambda1_candidates, _run_graph_sparse
+        )
+        graph_sparse_cfg = GraphSparseConfig(
+            lambda1=graph_sparse_lambda1,
+            lambda2=cfg["lambda2"],
+            max_iters=cfg["max_iters"],
+            tol_obj=cfg["tol_obj"],
+        )
+        graph_sparse_summary = _run_summary(
+            graph_sparse_result.history,
+            tol_obj=graph_sparse_cfg.tol_obj,
+            tol_orth=cfg["tol_orth"],
+            tol_gap=None,
+            final_gap=0.0,
+        )
+        if true_loadings is not None and true_supports is not None:
+            graph_sparse_aligned, graph_sparse_perm, graph_sparse_signs = _alignment(
+                graph_sparse_result.B, graph_sparse_result.B, true_loadings
+            )
+            graph_sparse_support = support_metrics(graph_sparse_aligned, true_supports)
+        else:
+            graph_sparse_aligned = graph_sparse_result.B
+            graph_sparse_perm = np.arange(graph_sparse_result.B.shape[1])
+            graph_sparse_signs = np.ones(graph_sparse_result.B.shape[1])
+            graph_sparse_support = None
+        graph_sparse_support_union = (
+            graph_sparse_support["union"] if graph_sparse_support else None
+        )
+        graph_sparse_union_mask = np.any(np.abs(graph_sparse_aligned) > 1e-8, axis=1)
+        graph_sparse_smoothness_raw = graph_smoothness_raw(graph_sparse_result.B, L)
+        graph_sparse_smoothness_norm = graph_smoothness_norm(graph_sparse_result.B, L)
+        graph_sparse_smoothness_ref = graph_smoothness_norm(graph_sparse_result.B, smooth_L_ref)
+        graph_sparse_eval = _canonical_method_metrics(
+            dataset=dataset_name,
+            graph_family=graph_family,
+            artifact_id=artifact_id,
+            artifact_version=artifact_version,
+            data_source=data_source,
+            prep_config_hash=prep_config_hash,
+            eval_protocol_id=eval_protocol_id,
+            method="GraphSparseNoOrth",
+            method_version="v1",
+            seed=cfg["seed"],
+            rank=cfg["r"],
+            lambda1=graph_sparse_lambda1,
+            lambda2=cfg["lambda2"],
+            rho=0.0,
+            corruption_type=dataset_meta.get("corruption_type", "none"),
+            corruption_level=float(dataset_meta.get("corruption_level", 0.0)),
+            graph_used_id=dataset_meta.get("graph_used_id", f"{graph_family}_clean"),
+            graph_reference_id=dataset_meta.get("graph_reference_id", f"{graph_family}_clean"),
+            explained_variance_value=explained_variance(
+                orthonormalize(graph_sparse_result.B), Sigma_hat
+            ),
+            smoothness_used_graph=graph_sparse_smoothness_norm,
+            smoothness_reference_graph=graph_sparse_smoothness_ref,
+            runtime_sec=0.0,
+            iterations=graph_sparse_summary["iterations"],
+            nnz=nnz_loadings(graph_sparse_result.B),
+            sparsity_ratio_value=sparsity_fraction(graph_sparse_result.B),
+            final_objective=float(graph_sparse_summary["final_objective"]),
+            final_coupling_gap=float(graph_sparse_summary["final_coupling_gap"]),
+            final_orthogonality_defect=float(graph_sparse_summary["final_orthogonality_defect"]),
+            stop_reason=graph_sparse_summary["stop_reason"],
+            convergence_flag=graph_sparse_summary["convergence_flag"],
+            support=graph_sparse_support_union,
+            n_samples=n_samples,
+            n_features=n_features,
+            extra={
+                "method_name": "GraphSparseNoOrth",
+                "objective_terms": objective_terms(
+                    graph_sparse_result.B,
+                    graph_sparse_result.B,
+                    Sigma_hat,
+                    L,
+                    cfg["lambda1"],
+                    cfg["lambda2"],
+                    0.0,
+                ),
+                "sparsity_fraction": sparsity_fraction(graph_sparse_result.B),
+                "orthogonality_error": orthogonality_error(
+                    orthonormalize(graph_sparse_result.B)
+                ),
+                "laplacian_energy": laplacian_energy(graph_sparse_result.B, L),
+                "support_metrics": graph_sparse_support,
+                "graph_smoothness_raw_trueL": graph_sparse_smoothness_raw,
+                "graph_smoothness_norm_trueL": graph_sparse_smoothness_norm,
+                "shared_explained_variance": explained_variance(
+                    orthonormalize(graph_sparse_result.B), Sigma_hat
+                ),
+                "optimization_note": "Non-manifold graph+sparsity baseline without orthogonality constraints.",
+                "lambda1_match_target_nnz": float(target_nnz),
+                "lambda1_matched_nnz": float(graph_sparse_nnz),
+            },
+        )
+        graph_sparse_eval["support_connectivity_union"] = support_connectivity(
+            graph_sparse_union_mask, L
+        )
+        metrics_out["GraphSparseNoOrth"] = graph_sparse_eval
 
         # Sparse PCA baseline (no graph regularization)
         L_zero = np.zeros_like(L)
+        def _run_spca(lam: float) -> SolverResult:
+            spca_cfg_local = SolverConfig(
+                lambda1=lam,
+                lambda2=0.0,
+                rho=cfg["rho"],
+                eta_A=cfg["eta_A"],
+                max_iters=cfg["max_iters"],
+                tol_obj=cfg["tol_obj"],
+                tol_gap=cfg["tol_gap"],
+                tol_orth=cfg["tol_orth"],
+            )
+            B0_local = soft_threshold(A0, lam / max(cfg["rho"], 1e-8))
+            return solve(A0, B0_local, Sigma_hat, L_zero, spca_cfg_local)
+
+        spca_lambda1, spca_result, spca_nnz = _match_lambda1(
+            target_nnz, lambda1_candidates, _run_spca
+        )
         spca_cfg = SolverConfig(
-            lambda1=cfg["lambda1"],
+            lambda1=spca_lambda1,
             lambda2=0.0,
             rho=cfg["rho"],
             eta_A=cfg["eta_A"],
@@ -627,7 +878,6 @@ def run(config_path: str) -> None:
             tol_gap=cfg["tol_gap"],
             tol_orth=cfg["tol_orth"],
         )
-        spca_result = solve(A0, B0, Sigma_hat, L_zero, spca_cfg)
         spca_summary = _run_summary(
             spca_result.history,
             tol_obj=spca_cfg.tol_obj,
@@ -661,7 +911,7 @@ def run(config_path: str) -> None:
             method_version="v1",
             seed=cfg["seed"],
             rank=cfg["r"],
-            lambda1=cfg["lambda1"],
+            lambda1=spca_lambda1,
             lambda2=0.0,
             rho=cfg["rho"],
             corruption_type=dataset_meta.get("corruption_type", "none"),
@@ -705,6 +955,8 @@ def run(config_path: str) -> None:
                 "shared_explained_variance": explained_variance(
                     orthonormalize(spca_result.B), Sigma_hat
                 ),
+                "lambda1_match_target_nnz": float(target_nnz),
+                "lambda1_matched_nnz": float(spca_nnz),
             },
         )
         spca_eval["support_connectivity_union"] = support_connectivity(
@@ -770,7 +1022,13 @@ def run(config_path: str) -> None:
 
     artifacts_meta = {
         "method_name": "Proposed",
-        "baseline_methods": ["PCA", "A-ManPG", "SparseNoGraph"],
+        "baseline_methods": [
+            "PCA",
+            "A-ManPG",
+            "GraphOnlyPCA",
+            "GraphSparseNoOrth",
+            "SparseNoGraph",
+        ],
         "status": status,
         "failure_reason": failure_reason,
         "manifest": manifest,

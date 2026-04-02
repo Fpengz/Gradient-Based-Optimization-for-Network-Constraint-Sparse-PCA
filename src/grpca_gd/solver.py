@@ -33,6 +33,20 @@ class SolverResult:
     history: Dict[str, np.ndarray]
 
 
+@dataclass
+class GraphSparseConfig:
+    lambda1: float
+    lambda2: float
+    max_iters: int
+    tol_obj: float
+
+
+@dataclass
+class GraphSparseResult:
+    B: np.ndarray
+    history: Dict[str, np.ndarray]
+
+
 def solve(
     A0: np.ndarray,
     B0: np.ndarray,
@@ -104,3 +118,68 @@ def solve(
 
     history_np = {k: np.array(v, dtype=float) for k, v in history.items()}
     return SolverResult(A=A, B=B, history=history_np)
+
+
+def solve_graph_sparse(
+    B0: np.ndarray,
+    sigma_hat: np.ndarray,
+    L: np.ndarray,
+    cfg: GraphSparseConfig,
+) -> GraphSparseResult:
+    B = B0.copy()
+
+    sigma_norm = float(np.linalg.eigvalsh(sigma_hat).max())
+    L_norm = float(np.linalg.eigvalsh(L).max())
+    eta = 1.0 / max(1e-8, 2.0 * sigma_norm + 2.0 * cfg.lambda2 * L_norm)
+
+    history: Dict[str, List[float]] = {
+        "total_objective": [],
+        "negative_variance_term": [],
+        "sparsity_penalty": [],
+        "graph_penalty": [],
+        "coupling_penalty": [],
+        "coupling_gap": [],
+        "orthogonality_error": [],
+        "sparsity_fraction": [],
+        "laplacian_energy": [],
+    }
+
+    prev_obj = None
+    for _ in range(cfg.max_iters):
+        grad = -2.0 * (sigma_hat @ B) + 2.0 * cfg.lambda2 * (L @ B)
+        B_new = soft_threshold(B - eta * grad, eta * cfg.lambda1)
+
+        if not np.isfinite(B_new).all():
+            back_eta = eta
+            for _ in range(10):
+                back_eta *= 0.5
+                B_new = soft_threshold(B - back_eta * grad, back_eta * cfg.lambda1)
+                if np.isfinite(B_new).all():
+                    eta = back_eta
+                    break
+
+        B = B_new
+        terms = objective_terms(B, B, sigma_hat, L, cfg.lambda1, cfg.lambda2, 0.0)
+        obj = terms["total_objective"]
+
+        history["total_objective"].append(obj)
+        history["negative_variance_term"].append(terms["negative_variance_term"])
+        history["sparsity_penalty"].append(terms["sparsity_penalty"])
+        history["graph_penalty"].append(terms["graph_penalty"])
+        history["coupling_penalty"].append(terms["coupling_penalty"])
+        history["coupling_gap"].append(0.0)
+        history["orthogonality_error"].append(orthogonality_error(np.linalg.qr(B)[0]))
+        history["sparsity_fraction"].append(sparsity_fraction(B))
+        history["laplacian_energy"].append(laplacian_energy(B, L))
+
+        if prev_obj is not None:
+            rel = abs(prev_obj - obj) / max(1.0, abs(prev_obj))
+            if rel <= cfg.tol_obj:
+                break
+        prev_obj = obj
+
+        if not np.isfinite(obj):
+            raise FloatingPointError("Objective became non-finite")
+
+    history_np = {k: np.array(v, dtype=float) for k, v in history.items()}
+    return GraphSparseResult(B=B, history=history_np)

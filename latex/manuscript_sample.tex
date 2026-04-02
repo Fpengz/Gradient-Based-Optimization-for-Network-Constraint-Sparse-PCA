@@ -66,7 +66,7 @@
 % Abstract
 % =========================
 \begin{abstract}
-We study sparse, graph-smooth, explicitly orthogonal multi-component PCA through a split-variable formulation that couples an orthogonal loading matrix with a sparse graph-regularized proxy. Rather than proposing new optimization primitives, we use this formulation as a controlled testbed to characterize when graph regularization helps or hurts under misspecification. Experiments spanning chain, grid, SBM, ER, kNN, and small-world graphs show a regime-based pattern: weak regularization is robust across topologies, while stronger regularization can amplify misspecification on fragile graphs. Real-data studies on TCGA-BRCA, MNIST (grid), and S\&P500 correlation graphs show aligned trends. We further show that robustness to graph misspecification is strongly topology-dependent: sparse, fragile graphs degrade under corruption, while redundant graphs (e.g., grids and kNN) are substantially more stable and can mitigate oversmoothing. Our contribution is thus an empirical characterization of topology- and regime-dependent behavior rather than a universal performance gain.
+We present a controlled empirical study of sparse, graph-smooth, explicitly orthogonal multi-component PCA through a split-variable formulation that couples an orthogonal loading matrix with a sparse graph-regularized proxy. Rather than proposing new optimization primitives, we use this minimal solver as a testbed to characterize when graph regularization helps or hurts under misspecification. Experiments spanning chain, grid, SBM, ER, kNN, and small-world graphs show a regime-based pattern: weak regularization is robust across topologies, while stronger regularization can amplify misspecification on fragile graphs. Real-data studies on TCGA-BRCA, MNIST (grid), and S\&P500 correlation graphs show aligned trends. We further show that robustness to graph misspecification is strongly topology-dependent: sparse, fragile graphs degrade under corruption, while redundant graphs (e.g., grids and kNN) are substantially more stable and can mitigate oversmoothing. Our contribution is thus an empirical characterization of topology- and regime-dependent behavior rather than a universal performance gain.
 \end{abstract}
 
 \section{Introduction}
@@ -97,6 +97,7 @@ The main contributions of this work are as follows.
     \item On chain graphs, recovery remains competitive with sparse baselines while smoothness improves; on SBM graphs, stronger regularization induces a clearer recovery--smoothness tradeoff.
     \item In a graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, moderate regularization preserves recovery while improving support connectivity and smoothness.
     \item We empirically characterize how graph topology governs the effect of graph regularization under misspecification.
+    \item We compare against graph-only PCA and a non-manifold graph+sparsity baseline to isolate the role of explicit orthogonality.
     \item We provide a concrete split-variable solver that combines explicit orthogonality, sparsity, and graph smoothness within a single executable framework.
 \end{itemize}
 
@@ -133,7 +134,7 @@ Nevertheless, structured sparse PCA in this sense is not identical to feature-gr
 The optimization backdrop for this problem has evolved substantially. Beyond the sparse-PCA-specific literature, recent work on nonsmooth and structured nonsmooth optimization over Riemannian submanifolds shows that manifold-based methods now handle a broader class of composite objectives than earlier sparse-only formulations \cite{li2024structurednonsmooth,chen2024nonsmoothstiefel}. Recent adjacent work also combines sparse regularization, Laplacian regularization, manifold proximal updates, semismooth Newton subproblem solvers, and convergence analysis in related problems such as sparse tensor CCA \cite{zhu2025stccal}. That literature does not solve our PCA formulation directly, but it does weaken any broad claim that the optimization ingredients themselves are unprecedented.
 
 \subsection{Positioning of the Present Work}
-Graph-aware PCA and graph-regularized sparse PCA have been studied in multiple forms, and we do not claim novelty in combining graph smoothness with sparsity. The specific gap we target is the joint extraction of multiple explicitly orthogonal components under a split-variable formulation with a concrete, reproducible solver. Our work is positioned as a focused intersection of sparse PCA, graph-regularized PCA, and orthogonality-preserving optimization, rather than as a first instance of any single ingredient.
+Graph-aware PCA and graph-regularized sparse PCA have been studied in multiple forms, and we do not claim novelty in combining graph smoothness with sparsity. Unlike prior graph-aware PCA work that focuses on performance improvements under aligned settings, our study explicitly characterizes failure modes under misspecification and shows that robustness is governed by graph topology. The specific gap we target is the joint extraction of multiple explicitly orthogonal components under a split-variable formulation with a concrete, reproducible solver. Our work is positioned as a focused intersection of sparse PCA, graph-regularized PCA, and orthogonality-preserving optimization, rather than as a first instance of any single ingredient.
 
 \section{Problem Setup}
 \label{sec:setup}
@@ -294,14 +295,14 @@ This section is intentionally descriptive rather than a proof development: we do
 \section{Experimental Setup}
 \label{sec:experiments}
 
-We evaluate only the executed synthetic study. The comparison set is limited to PCA, A-ManPG, SparseNoGraph, and the Proposed method. SparseNoGraph is the in-family ablation with $\lambda_2=0$, while A-ManPG is the minimal external sparse orthogonal baseline without graph coupling. The graph families are chain and SBM. Main robustness results use seeds $0$--$4$, while sweep experiments and the graph-aligned setting use seeds $0$--$2$. Shared evaluation metrics only are reported: support recovery, graph smoothness on the true graph, shared explained variance, and support connectivity.
+We evaluate only the executed synthetic study. The comparison set includes PCA, A-ManPG, GraphOnlyPCA ($\lambda_1=0$), a non-manifold graph+sparsity baseline (GraphSparseNoOrth), SparseNoGraph, and the Proposed method. SparseNoGraph is the in-family ablation with $\lambda_2=0$, while A-ManPG is the minimal external sparse orthogonal baseline without graph coupling. The graph families are chain and SBM. Main robustness results use seeds $0$--$4$, while sweep experiments and the graph-aligned setting use seeds $0$--$2$. Shared evaluation metrics only are reported: support recovery, graph smoothness on the true graph, shared explained variance, and support connectivity. For sparse baselines, we select $\lambda_1$ from a small grid to match the sparsity level (nnz) of the Proposed method for primary comparisons.
 
 \paragraph{Metric mapping and definitions.}
 Support metrics (precision/recall/F1 on the union and per component) are computed on $B$ after component matching to the true loadings; we use a Hungarian matching and sign correction before thresholding. Graph smoothness is reported as the normalized Laplacian energy
 \[
 \mathrm{Smoothness}(B;L) = \frac{\tr(B^\top L B)}{\tr(B^\top B)},
 \]
-computed on the true graph Laplacian. Shared explained variance is computed on an orthonormalized loading matrix: for Proposed and SparseNoGraph we use $Q=\mathrm{qr}(B)$, for A-ManPG we use $Q=\mathrm{qr}(A)$, and for PCA we use the top-$r$ eigenvectors of $\Sigmahat$. Support connectivity is computed on the union support mask (entries of $B$ exceeding $10^{-8}$) and reported as the number of connected components and the largest-component ratio.
+computed on the true graph Laplacian. Shared explained variance is computed on an orthonormalized loading matrix: for Proposed, GraphOnlyPCA, GraphSparseNoOrth, and SparseNoGraph we use $Q=\mathrm{qr}(B)$, for A-ManPG we use $Q=\mathrm{qr}(A)$, and for PCA we use the top-$r$ eigenvectors of $\Sigmahat$. Support connectivity is computed on the union support mask (entries of $B$ exceeding $10^{-8}$) and reported as the number of connected components and the largest-component ratio.
 
 \paragraph{A-ManPG settings.}
 We use the public A-ManPG baseline with step size $\eta_A=0.05$, maximum iterations $200$, and tolerances $\text{tol}_{\mathrm{obj}}=10^{-6}$ and $\text{tol}_{\mathrm{orth}}=10^{-6}$, initialized from the PCA solution.
@@ -325,10 +326,10 @@ We report multi-seed sweeps over $\lambda_2 \in \{0.0, 0.05, 0.1, 0.2, 0.5\}$ fo
 \label{sec:results}
 
 \subsection{Overview}
-We report synthetic results using shared evaluation metrics across all methods: union support F1, graph smoothness norm on the true graph, shared explained variance (after QR orthonormalization), and a support-connectivity diagnostic (largest connected-component ratio). Shared explained variance is an evaluation metric and is not the training objective for any method. We do not compare raw objective values across methods because they optimize different objectives. Results are presented for chain and SBM graphs across five seeds (0--4), and for multi-seed $\lambda_2$ sweeps (seeds 0--2). The comparison set includes PCA, A-ManPG, SparseNoGraph, and the Proposed method.
+We report synthetic results using shared evaluation metrics across all methods: union support F1, graph smoothness norm on the true graph, shared explained variance (after QR orthonormalization), and a support-connectivity diagnostic (largest connected-component ratio). Shared explained variance is an evaluation metric and is not the training objective for any method. We do not compare raw objective values across methods because they optimize different objectives. Results are presented for chain and SBM graphs across five seeds (0--4), and for multi-seed $\lambda_2$ sweeps (seeds 0--2). The comparison set includes PCA, A-ManPG, GraphOnlyPCA ($\lambda_1=0$), a non-manifold graph+sparsity baseline (GraphSparseNoOrth), SparseNoGraph, and the Proposed method. Primary comparison uses matched sparsity; secondary appendix comparison uses each baseline tuned within its own family under a fixed validation protocol.
 
 \subsection{Chain Robustness (Seeds 0--4)}
-Across seeds, PCA is consistently worst on support recovery. A-ManPG improves substantially over PCA but remains below the sparse baselines on mean support F1. SparseNoGraph achieves the highest mean support F1, while the Proposed method attains slightly lower F1 but achieves a lower graph smoothness norm on the true chain graph. Shared explained variance is similar across the non-PCA methods and lower than PCA, as expected for sparse baselines. This pattern indicates that on chain graphs, graph regularization improves structural coherence while remaining competitive on recovery.
+Across seeds, PCA is consistently worst on support recovery. A-ManPG improves substantially over PCA but remains below the sparse baselines on mean support F1. GraphOnlyPCA yields smoother loadings but remains dense and therefore weak on support recovery, while the non-manifold GraphSparseNoOrth baseline underperforms on recovery and variance. SparseNoGraph achieves the highest mean support F1, while the Proposed method attains slightly lower F1 but achieves a lower graph smoothness norm on the true chain graph. Shared explained variance is similar across the non-PCA methods and lower than PCA, as expected for sparse baselines. This pattern indicates that on chain graphs, graph regularization improves structural coherence while remaining competitive on recovery.
 \begin{table}[t]
 \centering
 \scriptsize
@@ -341,8 +342,10 @@ Across seeds, PCA is consistently worst on support recovery. A-ManPG improves su
 Method & Support F1 & Smoothness (norm) & Shared explained var \\
 \midrule
 PCA & 0.261 $\pm$ 0.000 & 2.099 $\pm$ 0.484 & 6.225 $\pm$ 0.406 \\
-A-ManPG & 0.914 $\pm$ 0.078 & 2.111 $\pm$ 0.483 & 6.122 $\pm$ 0.408 \\
-SparseNoGraph & 0.950 $\pm$ 0.033 & 2.118 $\pm$ 0.476 & 6.092 $\pm$ 0.413 \\
+A-ManPG & 0.862 $\pm$ 0.093 & 2.111 $\pm$ 0.484 & 6.130 $\pm$ 0.406 \\
+GraphOnlyPCA & 0.261 $\pm$ 0.000 & 1.893 $\pm$ 0.429 & 6.191 $\pm$ 0.402 \\
+GraphSparseNoOrth & 0.261 $\pm$ 0.000 & 1.993 $\pm$ 0.559 & 4.364 $\pm$ 0.966 \\
+SparseNoGraph & 0.917 $\pm$ 0.072 & 2.120 $\pm$ 0.483 & 6.050 $\pm$ 0.364 \\
 Proposed & 0.927 $\pm$ 0.019 & 1.871 $\pm$ 0.465 & 6.059 $\pm$ 0.415 \\
 \bottomrule
 \end{tabular}%
@@ -350,7 +353,7 @@ Proposed & 0.927 $\pm$ 0.019 & 1.871 $\pm$ 0.465 & 6.059 $\pm$ 0.415 \\
 \end{table}
 
 \subsection{SBM Robustness (Seeds 0--4)}
-On SBM graphs, PCA again performs worst on support recovery. A-ManPG again improves over PCA but does not match the sparse baselines on support recovery. SparseNoGraph attains substantially higher support F1 than the Proposed method, while the Proposed method is consistently smoother on the true SBM graph (lower normalized graph smoothness). Shared explained variance remains comparable across the sparse methods. These results show a stable recovery--smoothness tradeoff on SBM: stronger graph regularization improves structural smoothness but can reduce recovery accuracy.
+On SBM graphs, PCA again performs worst on support recovery. A-ManPG again improves over PCA but does not match the sparse baselines on support recovery. GraphOnlyPCA attains lower smoothness values but remains dense, and GraphSparseNoOrth exhibits substantially weaker recovery and variance. SparseNoGraph attains substantially higher support F1 than the Proposed method, while the Proposed method is consistently smoother on the true SBM graph (lower normalized graph smoothness). Shared explained variance remains comparable across the sparse methods. These results show a stable recovery--smoothness tradeoff on SBM: stronger graph regularization improves structural smoothness but can reduce recovery accuracy.
 \begin{table}[t]
 \centering
 \scriptsize
@@ -363,8 +366,10 @@ On SBM graphs, PCA again performs worst on support recovery. A-ManPG again impro
 Method & Support F1 & Smoothness (norm) & Shared explained var \\
 \midrule
 PCA & 0.261 $\pm$ 0.000 & 17.085 $\pm$ 0.974 & 6.225 $\pm$ 0.406 \\
-A-ManPG & 0.914 $\pm$ 0.078 & 17.134 $\pm$ 1.008 & 6.122 $\pm$ 0.408 \\
-SparseNoGraph & 0.950 $\pm$ 0.033 & 17.166 $\pm$ 1.035 & 6.092 $\pm$ 0.413 \\
+A-ManPG & 0.862 $\pm$ 0.093 & 17.135 $\pm$ 1.018 & 6.130 $\pm$ 0.406 \\
+GraphOnlyPCA & 0.261 $\pm$ 0.000 & 13.176 $\pm$ 2.192 & 5.755 $\pm$ 0.448 \\
+GraphSparseNoOrth & 0.209 $\pm$ 0.117 & 11.504 $\pm$ 6.686 & 2.981 $\pm$ 1.784 \\
+SparseNoGraph & 0.965 $\pm$ 0.028 & 17.156 $\pm$ 1.042 & 6.103 $\pm$ 0.409 \\
 Proposed & 0.744 $\pm$ 0.051 & 15.764 $\pm$ 1.104 & 6.003 $\pm$ 0.384 \\
 \bottomrule
 \end{tabular}%
@@ -392,8 +397,10 @@ Figure~\ref{fig:graph-aligned-sweep} summarizes the graph-aligned chain experime
 Method & Support F1 & Smoothness (norm) & Largest CC ratio \\
 \midrule
 PCA & 0.261 $\pm$ 0.000 & 2.047 $\pm$ 0.472 & 1.000 $\pm$ 0.000 \\
-A-ManPG & 0.861 $\pm$ 0.016 & 2.049 $\pm$ 0.471 & 0.286 $\pm$ 0.014 \\
-SparseNoGraph & 0.934 $\pm$ 0.047 & 2.049 $\pm$ 0.457 & 0.302 $\pm$ 0.039 \\
+A-ManPG & 0.790 $\pm$ 0.041 & 2.048 $\pm$ 0.474 & 0.242 $\pm$ 0.032 \\
+GraphOnlyPCA & 0.261 $\pm$ 0.000 & 1.863 $\pm$ 0.484 & 1.000 $\pm$ 0.000 \\
+GraphSparseNoOrth & 0.261 $\pm$ 0.000 & 2.144 $\pm$ 0.616 & 1.000 $\pm$ 0.000 \\
+SparseNoGraph & 0.896 $\pm$ 0.044 & 2.074 $\pm$ 0.405 & 0.321 $\pm$ 0.063 \\
 Proposed & 0.914 $\pm$ 0.016 & 1.810 $\pm$ 0.456 & 0.377 $\pm$ 0.014 \\
 \bottomrule
 \end{tabular}%
@@ -448,12 +455,20 @@ These results suggest that the effect of graph regularization under misspecifica
 We report $\lambda_2$ sweeps on TCGA-BRCA (STRING), MNIST (grid), and S\&P500 (correlation) to assess how the graph prior affects variance--smoothness tradeoffs in realistic settings (Figure~\ref{fig:realdata-unified}).
 These trends are consistent with the topology-dependent behavior observed in synthetic experiments: MNIST (grid-like) exhibits stable performance across $\lambda_2$, TCGA-BRCA (modular) shows moderate sensitivity, and S\&P500 (noisy correlation graph) is more sensitive at higher $\lambda_2$.
 These results suggest that real-world graphs behave similarly to their synthetic analogues: grid-like structures (MNIST) are robust, while noisier correlation graphs (S\&P500) are more sensitive to regularization strength.
+To deepen the TCGA-BRCA case, we assess stability across seeds and graph-coherence of selected supports against both uniform and degree-matched nulls (Figure~\ref{fig:tcga-stability-coherence}).
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{../figures/realdata/realdata_unified_panels.png}
 \caption{Unified real-data $\lambda_2$ sweeps on TCGA-BRCA (STRING), MNIST (grid), and S\&P500 (correlation). Curves show mean trends across seeds for explained variance, graph smoothness, and sparsity.}
 \label{fig:realdata-unified}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../figures/realdata/tcga_stability_coherence.png}
+\caption{TCGA-BRCA deep dive at $\lambda_2=0.1$ (Proposed). Left: seed-to-seed stability of the learned supports and subspaces. Right: graph-coherence diagnostics for the selected supports compared to uniform and degree-matched random gene sets, showing elevated density and average degree relative to nulls.}
+\label{fig:tcga-stability-coherence}
 \end{figure}
 
 \clearpage
