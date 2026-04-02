@@ -8,7 +8,7 @@
 \usepackage{mathtools}
 \usepackage{microtype}
 \usepackage{graphicx}
-\graphicspath{{figures/}{../figures/}{../figures/realdata/}}
+\graphicspath{{../figures/}{../figures/phase2/}{../figures/phase2/compare/}{../figures/phase2/realdata/}{../figures/realdata/}}
 \usepackage{subcaption}
 \usepackage{booktabs}
 \usepackage{multirow}
@@ -48,7 +48,6 @@
 \setlength{\columnsep}{0.25in}
 \setlength{\emergencystretch}{3em}
 \hbadness=10000
-\graphicspath{{figures/}{../figures/}{../figures/realdata/}}
 
 % =========================
 % Title
@@ -66,7 +65,7 @@
 % Abstract
 % =========================
 \begin{abstract}
-We study sparse, graph-smooth, explicitly orthogonal multi-component PCA under controlled graph misspecification. Using a split-variable solver as a testbed, we map how weak versus strong regularization behaves on fragile (chains) and redundant (grids) graphs. At low $\lambda_2$, performance is robust to misspecification; at higher $\lambda_2$, chains degrade under rewiring while grids remain largely invariant. We document an illusory smoothness effect: smoothness under the imposed (possibly corrupted) graph can improve even as support recovery worsens. We also show a graph-aligned regime in which graph regularization genuinely helps, and include a small TCGA-BRCA sanity check. Our claims are intentionally modest: graph regularization can help in aligned settings, but its reliability depends on regularization strength and topology, and smoothness under the imposed graph can be misleading.
+We study sparse, graph-smooth, explicitly orthogonal multi-component PCA under controlled graph misspecification. Using a concrete split-variable solver as a controlled testbed, we find a regime split: weak regularization is robust across priors, while stronger regularization induces topology-dependent sensitivity---chains degrade under rewiring whereas grids remain largely invariant. We document an illusory smoothness effect: smoothness under the imposed (possibly corrupted) graph can improve even as support recovery worsens. We also identify a graph-aligned regime in which regularization helps, and include a small TCGA-BRCA sanity check. Our claims are intentionally modest: graph regularization can help in aligned settings, but its reliability depends on regularization strength and topology, and smoothness under the imposed graph can be misleading.
 \end{abstract}
 
 \section{Introduction}
@@ -288,7 +287,7 @@ Support metrics (precision/recall/F1 on the union and per component) are compute
 \[
 \mathrm{Smoothness}(B;L) = \frac{\tr(B^\top L B)}{\tr(B^\top B)},
 \]
-computed on the true graph Laplacian. Shared explained variance is computed on an orthonormalized loading matrix: for Proposed and SparseNoGraph we use $Q=\mathrm{qr}(B)$, for A-ManPG we use $Q=\mathrm{qr}(A)$, and for PCA we use the top-$r$ eigenvectors of $\Sigmahat$. Support connectivity is computed on the union support mask (entries of $B$ exceeding $10^{-8}$) and reported as the number of connected components and the largest-component ratio.
+computed on the true graph Laplacian. Shared explained variance is computed on an orthonormalized loading matrix: for Proposed, SparseNoGraph, GraphOnlyPCA, and GraphSparseNoOrth we use $Q=\mathrm{qr}(B)$, for A-ManPG we use $Q=\mathrm{qr}(A)$, and for PCA we use the top-$r$ eigenvectors of $\Sigmahat$. Support connectivity is computed on the union support mask (entries of $B$ exceeding $10^{-8}$) and reported as the number of connected components and the largest-component ratio in the appendix aligned-case summary.
 
 \paragraph{A-ManPG settings.}
 We use the public A-ManPG baseline with step size $\eta_A=0.05$, maximum iterations $200$, and tolerances $\text{tol}_{\mathrm{obj}}=10^{-6}$ and $\text{tol}_{\mathrm{orth}}=10^{-6}$, initialized from the PCA solution.
@@ -321,7 +320,7 @@ Figure~\ref{fig:chain-lambda2-sweep} reports the $\lambda_2$ sweep on chain grap
 \end{figure}
 
 \subsection{Baseline Method Comparison on Chain (Seeds 0--4)}
-Across seeds, PCA is consistently worst on support recovery. A-ManPG improves substantially over PCA but remains below the sparse baselines on mean support F1. GraphOnlyPCA yields smoother loadings but remains dense and therefore weak on support recovery, while the non-manifold GraphSparseNoOrth baseline underperforms on recovery and variance. SparseNoGraph achieves the highest mean support F1, while the Proposed method attains slightly lower F1 but achieves a lower graph smoothness norm on the true chain graph. Shared explained variance is similar across the non-PCA methods and lower than PCA, as expected for sparse baselines. This establishes a clean baseline comparison before the regime analysis.
+Dense baselines (PCA, GraphOnlyPCA) fail on support recovery, while sparse baselines recover well; the non-manifold sparse+graph baseline remains weaker in recovery and variance. Graph regularization improves smoothness relative to the purely sparse variant, and explicit orthogonality keeps the full method competitive in recovery while preserving smoother structure. Shared explained variance is similar across the sparse methods and lower than PCA, as expected for sparse baselines. This establishes a clean baseline comparison before the regime analysis.
 \begin{table}[t]
 \centering
 \scriptsize
@@ -345,7 +344,7 @@ Proposed & 0.927 $\pm$ 0.019 & 1.871 $\pm$ 0.465 & 6.059 $\pm$ 0.415 \\
 \end{table}
 
 \subsection{Chain vs.\ Grid Misspecification Comparison}
-Figure~\ref{fig:phase2-compare} contrasts chain and grid under the same corruption and $\lambda_2$ sweep. The chain exhibits clear degradation under rewiring at moderate-to-high $\lambda_2$, while grid graphs remain largely invariant under the same perturbations. Quantitatively, the clean--rewire gap in support F1 at $\lambda_2=0.5$ and $1.0$ is $+0.058$ and $+0.076$ for the chain, but $-0.041$ and $-0.028$ for the grid. The small sign changes on the grid indicate that misspecification effects are weak and unstable in direction, consistent with robustness rather than genuine benefit.
+Figure~\ref{fig:phase2-compare} contrasts chain and grid under the same corruption and $\lambda_2$ sweep. The chain exhibits clear degradation under rewiring at moderate-to-high $\lambda_2$, while grid graphs remain largely invariant under the same perturbations. Quantitatively, the clean--rewire gap in support F1 at $\lambda_2=0.5$ and $1.0$ is $+0.058$ and $+0.076$ for the chain. For the grid, the corresponding gaps are $-0.041$ and $-0.028$ (positive = clean better, negative = rewire better). The small sign changes on the grid indicate that misspecification effects are weak and inconsistent in sign, consistent with robustness rather than genuine benefit.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{phase2/compare/blockAB_chain_grid_lambda2_sweep.png}
@@ -354,15 +353,14 @@ Figure~\ref{fig:phase2-compare} contrasts chain and grid under the same corrupti
 \end{figure}
 
 \paragraph{Illusory smoothness (quantified).}
-At $\lambda_2=0.5$ and $\alpha=0.2$ on the chain, rewiring reduces the imposed-graph Laplacian energy from $1.916$ to $1.599$ ($\Delta=-0.317$) while true-graph smoothness worsens (mean increases by $0.323$) and support F1 drops by $0.058$ (mean over seeds $0$--$2$), illustrating that smoothness under a corrupted prior can improve even as fidelity to the true graph and recovery degrade.
+At $\lambda_2=0.5$ and $\alpha=0.2$ on the chain, rewiring reduces the imposed-graph Laplacian energy from $1.916$ to $1.599$ ($\Delta=-0.317$) while the true-graph Laplacian energy worsens (mean increases by $0.323$) and support F1 drops by $0.058$ (mean over seeds $0$--$2$), illustrating that smoothness under a corrupted prior can improve even as fidelity to the true graph and recovery degrade.
 
 \subsection{Corruption Phase Diagram}
-Figure~\ref{fig:phase2-alpha} reports a phase diagram over $(\lambda_2,\alpha)$ for chain graphs, with separate panels for deletion and rewiring. The color scale shows absolute support F1 on the true graph. Misspecification effects strengthen with increasing $\alpha$, and the most pronounced degradation occurs when both $\lambda_2$ and $\alpha$ are large. The diagram summarizes the regime boundary between robust low-$\lambda_2$ behavior and high-$\lambda_2$ sensitivity to corruption.
-Appendix~\ref{app:topology} reports SBM and kNN misspecification results that follow the same topology-dependent pattern.
+Figure~\ref{fig:phase2-alpha} reports a phase diagram over $(\lambda_2,\alpha)$ for chain graphs, with separate panels for deletion and rewiring. The color scale shows absolute support F1 on the true graph. Misspecification effects strengthen with increasing $\alpha$, and the most pronounced degradation occurs when both $\lambda_2$ and $\alpha$ are large; Appendix~\ref{app:topology} reports SBM and kNN misspecification results that follow the same topology-dependent pattern.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{phase2/compare/phase2_chain_alpha_lambda2_phase_diagram.png}
-\caption{Phase diagram on chain graphs. Support F1 as a function of $(\lambda_2,\alpha)$ for deletion (left) and rewiring (right). Sensitivity grows as both $\lambda_2$ and $\alpha$ increase, delimiting a robust low-$\lambda_2$ region.}
+\caption{Phase diagram on chain graphs. Absolute support F1 on the true graph as a function of $(\lambda_2,\alpha)$ for deletion (left) and rewiring (right). Sensitivity grows as both $\lambda_2$ and $\alpha$ increase, delimiting a robust low-$\lambda_2$ region.}
 \label{fig:phase2-alpha}
 \end{figure}
 
@@ -376,7 +374,7 @@ Figure~\ref{fig:graph-aligned-sweep} summarizes the graph-aligned chain experime
 \end{figure}
 
 \subsection{Real-Data Sanity Check (TCGA-BRCA)}
-We run a $\lambda_2$ sweep on TCGA-BRCA expression with a STRING PPI graph using three random initializations and report smoothness and shared explained variance (Figure~\ref{fig:realdata}). We observe that moderate $\lambda_2$ yields stable variance--smoothness tradeoffs, while larger $\lambda_2$ leads to more aggressive smoothing with diminishing variance gains, consistent with the synthetic regime behavior.
+We run a $\lambda_2$ sweep on TCGA-BRCA expression with a STRING PPI graph using three random initializations and report smoothness and shared explained variance (Figure~\ref{fig:realdata}). We observe that moderate $\lambda_2$ yields stable variance--smoothness tradeoffs, while larger $\lambda_2$ leads to more aggressive smoothing with diminishing variance gains, consistent with the synthetic regime behavior; this qualitative stability under moderate $\lambda_2$ is consistent with the broader topology-dependent picture observed in the synthetic experiments.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{phase2/realdata/realdata_lambda2_sweep.png}
@@ -389,14 +387,14 @@ We run a $\lambda_2$ sweep on TCGA-BRCA expression with a STRING PPI graph using
 
 These experiments establish a focused empirical message: graph regularization is not universally helpful, and its reliability depends on both regularization strength and topology. On chain graphs, strong regularization amplifies misspecification effects, especially under rewiring; on grid graphs, performance is largely invariant under the same perturbations. We also observe an illusory smoothness effect: smoothness measured under the imposed (possibly corrupted) prior can improve even as true-support recovery worsens. In the graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, moderate regularization preserves recovery while improving structural coherence, indicating a setting where the graph prior is genuinely helpful.
 
-The mechanism paragraph is simple. Chains depend on precise adjacency: rewiring breaks the local relationships that Laplacian smoothness is meant to encode. Grids have redundant paths; redundancy flattens the effect of perturbations and reduces sensitivity to misspecification.
+A simple mechanism explains this pattern. Chains depend on precise adjacency: rewiring breaks the local relationships that Laplacian smoothness is meant to encode. Grids have redundant paths; redundancy flattens the effect of perturbations and reduces sensitivity to misspecification.
 
-The main limitation of the current evidence is its synthetic emphasis and narrow topology coverage in the main text. We include a small TCGA-BRCA sanity check and move broader topology and real-data evidence to the appendix. These results demonstrate that structural priors can help, but they also show that regularization strength must be tuned to topology and that smoothness under the imposed graph should not be conflated with structural fidelity.
+The main limitation of the current evidence is its synthetic emphasis and narrow topology coverage in the main text. We include a small TCGA-BRCA sanity check and move broader topology and real-data evidence to the appendix. Accordingly, we interpret the paper as a controlled characterization of reliability under misspecification rather than a comprehensive survey of graph families. These results demonstrate that structural priors can help, but they also show that regularization strength must be tuned to topology and that smoothness under the imposed graph should not be conflated with structural fidelity.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-Graph regularization is not universally helpful. Its reliability depends on regularization strength and topology, and smoothness under the imposed graph can be misleading under misspecification. In aligned settings, however, graph priors can improve structural coherence without sacrificing recovery. These findings support a modest, defensible claim: use graph regularization with topology-aware tuning and interpret smoothness gains cautiously, especially when the graph is sparse or known to be noisy.
+Graph regularization is not universally helpful. Its reliability depends on regularization strength and topology, and smoothness under the imposed graph can be misleading under misspecification. In aligned settings, however, graph priors can improve structural coherence without sacrificing recovery. These findings support a modest, defensible claim: use graph regularization with topology-aware tuning and interpret smoothness gains cautiously, especially when the graph is sparse or known to be noisy. More broadly, the results suggest that smoothness under an imposed graph should be treated as a topology-sensitive diagnostic rather than as evidence of structural fidelity.
 
 \appendix
 
@@ -437,7 +435,7 @@ Sweeping $\lambda_2 \in \{0.0, 0.05, 0.1, 0.2, 0.5\}$ across seeds (0--2) reveal
 \end{figure}
 
 \subsection{Broader Misspecification Topologies (SBM, kNN)}
-We extend the misspecification analysis to SBM and kNN topologies. Figure~\ref{fig:corruption-phase} presents phase diagrams over $(\lambda_2,\alpha)$ for different graph families, and Figure~\ref{fig:corruption-summary} summarizes a representative high-regularization setting. The same topology-dependent pattern holds: fragile graphs degrade under corruption, while redundant graphs are substantially more stable and can even show slight improvements consistent with reduced oversmoothing.
+We extend the misspecification analysis to SBM and kNN topologies. Figure~\ref{fig:corruption-phase} presents phase diagrams over $(\lambda_2,\alpha)$ for different graph families, and Figure~\ref{fig:corruption-summary} summarizes a representative high-regularization setting. The same topology-dependent pattern holds: fragile graphs degrade under corruption, while redundant graphs are substantially more stable and can even show slight improvements or near-invariant performance.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{corruption_phase_panels.png}
@@ -448,7 +446,7 @@ We extend the misspecification analysis to SBM and kNN topologies. Figure~\ref{f
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{corruption_delta_summary.png}
-\caption{Change relative to the clean graph at a representative high-regularization setting ($\lambda_2 = 0.5, \alpha = 0.4$). Chain shows clear degradation, whereas grid, SBM, and kNN exhibit little degradation or slight improvement. Bars show mean $\Delta$F1 over seeds; error bars indicate standard error.}
+\caption{Change relative to the clean graph at a representative high-regularization setting ($\lambda_2 = 0.5, \alpha = 0.4$). Chain shows clear degradation, whereas grid, SBM, and kNN exhibit little degradation or slight improvement or near-invariant performance. Bars show mean $\Delta$F1 over seeds; error bars indicate standard error.}
 \label{fig:corruption-summary}
 \end{figure}
 
