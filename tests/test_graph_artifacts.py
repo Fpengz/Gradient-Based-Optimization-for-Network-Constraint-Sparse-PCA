@@ -1,6 +1,6 @@
 import numpy as np
 
-from grpca_gd.synthetic.graphs import chain_graph_artifact, sbm_graph_laplacian
+from topospca.synthetic.graphs import chain_graph_artifact, sbm_graph_laplacian
 
 
 def test_graph_artifact_shapes():

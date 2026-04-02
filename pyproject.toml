@@ -1,7 +1,7 @@
 [project]
-name = "grpca-gd"
+name = "topospca"
 version = "0.1.0"
-description = "Graph-smooth sparse orthogonal PCA scaffold"
+description = "Topology-Dependent Robustness in Graph-Regularized Sparse PCA"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

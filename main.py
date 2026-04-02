@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from grpca_gd.runner import run  # noqa: E402
+from topospca.runner import run  # noqa: E402
 
 
 def main() -> None:

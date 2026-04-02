@@ -1,6 +1,6 @@
 import numpy as np
 
-from grpca_gd.objective import objective_terms
+from topospca.objective import objective_terms
 
 
 def test_objective_terms_sum():

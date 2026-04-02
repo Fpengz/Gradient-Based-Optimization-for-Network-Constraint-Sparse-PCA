@@ -3,9 +3,9 @@ import json
 import numpy as np
 import yaml
 
-from grpca_gd.amanpg import AmanpgConfig, solve_amanpg
-from grpca_gd.objective import objective_terms
-from grpca_gd.runner import run
+from topospca.amanpg import AmanpgConfig, solve_amanpg
+from topospca.objective import objective_terms
+from topospca.runner import run
 
 
 def test_amanpg_returns_orthonormal_columns():
