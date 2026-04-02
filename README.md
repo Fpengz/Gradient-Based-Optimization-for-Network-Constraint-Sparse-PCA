@@ -7,19 +7,18 @@ This project uses Git worktrees. Each worktree is a full checkout of the same re
 
 Current worktrees:
 - **Main repo:** `/Users/zhoufuwang/Projects/GRPCA-GD` (baseline reference; avoid editing for active Track A changes)
-- **Active Phase 2 worktree:** `/Users/zhoufuwang/Projects/GRPCA-GD/.worktrees/trackA-revision-plan`  
-  Branch: `paper-trackA-phase2-final` (this is the authoritative Track A paper state)
-- **Historical worktree:** `/Users/zhoufuwang/Projects/GRPCA-GD/.worktrees/codex/paper1-trackA-v1-revision`  
-  Branch: `codex/paper1-trackA-v1-revision` (legacy snapshot)
+- **Active Phase 2 worktree:** `/Users/zhoufuwang/Projects/GRPCA-GD/.worktrees/paper-trackA-phase2-final`  
+  Branch: `paper-trackA-phase2-final` (authoritative Track A paper state)
+- **Historical worktree:** `/Users/zhoufuwang/Projects/GRPCA-GD/.worktrees/paper-trackA-phase1-revision`  
+  Branch: `paper-trackA-phase1-revision` (legacy snapshot)
 
-Naming convention:
-- Worktrees live under `GRPCA-GD/.worktrees/<group>/<purpose>`
-- Branch names follow:  
-  `paper-<track>-<phase>-<status>` (e.g., `paper-trackA-phase2-final`)  
-  `codex/<purpose>` for historical or scratch branches
+Naming convention (must be adhered to for both branch and folder names):
+- Worktree directories: `GRPCA-GD/.worktrees/<branch-name>`
+- Branch names: `paper-<track>-<phase>-<status>` (e.g., `paper-trackA-phase2-final`)
+- Historical/scratch branches must still follow the same naming scheme.
 
 If you are working on Track A Phase 2, always use:
-`/Users/zhoufuwang/Projects/GRPCA-GD/.worktrees/trackA-revision-plan`
+`/Users/zhoufuwang/Projects/GRPCA-GD/.worktrees/paper-trackA-phase2-final`
 
 ## Methods Compared (Paper-1)
 - PCA (dense baseline)
