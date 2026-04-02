@@ -89,7 +89,8 @@ def main() -> None:
         output_dir = run["output_dir"]
         experiment = _experiment_label(cfg, output_dir)
         for method, payload in metrics.items():
-            support = payload.get("support_metrics", {}).get("union", {})
+            support_metrics = payload.get("support_metrics") or {}
+            support = support_metrics.get("union", {})
             conn = payload.get("support_connectivity_union", {})
             row = {
                 "experiment": experiment,

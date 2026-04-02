@@ -12,7 +12,7 @@ OUT_DIR = ROOT / "figures" / "realdata"
 
 def main() -> None:
     df = pd.read_csv(RESULTS)
-    df = df[df["dataset"].isin(["mnist", "tcga", "sp500"]) & (df["method"] == "Proposed")]
+    df = df[df["dataset"].isin(["mnist", "tcga_brca", "sp500"]) & (df["method"] == "Proposed")]
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     fig, axes = plt.subplots(3, 1, figsize=(6, 10), sharex=True)
@@ -21,7 +21,7 @@ def main() -> None:
         ["explained_variance", "smoothness_used_graph", "sparsity_ratio"],
         ["Explained variance", "Smoothness", "Sparsity"],
     ):
-        for dataset in ["mnist", "tcga", "sp500"]:
+        for dataset in ["mnist", "tcga_brca", "sp500"]:
             sub = df[df["dataset"] == dataset]
             ax.plot(sub["lambda2"], sub[metric], label=dataset)
         ax.set_ylabel(title)

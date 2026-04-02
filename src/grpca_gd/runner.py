@@ -28,7 +28,14 @@ from .metrics import (
 from .objective import objective_terms
 from .solver import SolverConfig, solve, soft_threshold
 from .synthetic.data import generate_dataset
-from .synthetic.graphs import chain_graph_laplacian, sbm_graph_laplacian
+from .synthetic.graphs import (
+    chain_graph_laplacian,
+    grid_graph_laplacian,
+    knn_graph_laplacian,
+    sbm_graph_laplacian,
+    small_world_laplacian,
+)
+from .synthetic.corruption import delete_edges, rewire_edges, perturb_weights
 
 
 def _hash_bytes(data: bytes) -> str:
@@ -266,7 +273,24 @@ def run(config_path: str) -> None:
         else:
             graph_family = cfg["graph_family"]
             if graph_family == "chain":
-                L, _ = chain_graph_laplacian(cfg["p"])
+                L, W = chain_graph_laplacian(cfg["p"])
+            elif graph_family == "grid":
+                rows = int(cfg.get("grid_rows", 10))
+                cols = int(cfg.get("grid_cols", 10))
+                if rows * cols != cfg["p"]:
+                    raise ValueError("grid_rows * grid_cols must equal p")
+                L, W = grid_graph_laplacian(rows, cols)
+            elif graph_family == "knn":
+                knn_k = int(cfg.get("knn_k", 5))
+                knn_dim = int(cfg.get("knn_dim", 2))
+                rng = np.random.default_rng(cfg["seed"] + 123)
+                points = rng.normal(size=(cfg["p"], knn_dim))
+                L, W = knn_graph_laplacian(points, knn_k)
+            elif graph_family == "small_world":
+                sw_k = int(cfg.get("small_world_k", 2))
+                sw_beta = float(cfg.get("small_world_beta", 0.1))
+                rng = np.random.default_rng(cfg["seed"] + 123)
+                L, W = small_world_laplacian(cfg["p"], sw_k, sw_beta, rng)
             elif graph_family == "sbm":
                 rng = np.random.default_rng(cfg["seed"] + 123)
                 blocks = int(cfg.get("sbm_blocks", 3))
@@ -275,11 +299,36 @@ def run(config_path: str) -> None:
                 block_sizes = cfg.get("sbm_block_sizes")
                 if block_sizes is not None:
                     block_sizes = [int(x) for x in block_sizes]
-                L, _ = sbm_graph_laplacian(
+                L, W = sbm_graph_laplacian(
                     cfg["p"], blocks, p_in, p_out, rng, block_sizes=block_sizes
                 )
             else:
-                raise ValueError("graph_family must be 'chain' or 'sbm'")
+                raise ValueError(
+                    "graph_family must be 'chain', 'grid', 'knn', 'small_world', or 'sbm'"
+                )
+            L_ref = L
+            corruption_type = str(cfg.get("corruption_type", "none"))
+            corruption_level = float(cfg.get("corruption_level", 0.0))
+            if corruption_type != "none" and corruption_level > 0.0:
+                rng = np.random.default_rng(cfg["seed"] + 999)
+                if corruption_type == "delete":
+                    W_used = delete_edges(W, corruption_level, rng)
+                elif corruption_type == "rewire":
+                    W_used = rewire_edges(W, corruption_level, rng)
+                elif corruption_type == "perturb":
+                    W_used = perturb_weights(W, corruption_level, rng)
+                else:
+                    raise ValueError("corruption_type must be none/delete/rewire/perturb")
+                D_used = np.diag(W_used.sum(axis=1))
+                L = D_used - W_used
+                dataset_meta = {
+                    "corruption_type": corruption_type,
+                    "corruption_level": corruption_level,
+                    "graph_used_id": f"{graph_family}_{corruption_type}_{corruption_level:.2f}",
+                    "graph_reference_id": f"{graph_family}_clean",
+                }
+            else:
+                L_ref = L
             dataset = generate_dataset(
                 n=cfg["n"],
                 p=cfg["p"],
@@ -294,7 +343,7 @@ def run(config_path: str) -> None:
                 decoy_variance_factor=float(cfg.get("decoy_variance_factor", 0.0)),
             )
             X = dataset.X
-            dataset_meta = dict(dataset.metadata)
+            dataset_meta = {**dataset_meta, **dataset.metadata}
             dataset_name = "synthetic"
             artifact_id = f"synthetic_{graph_family}"
             artifact_version = "v1"
@@ -501,8 +550,10 @@ def run(config_path: str) -> None:
             support = None
         support_union = support["union"] if support else None
         proposed_union_mask = np.any(np.abs(B_aligned) > 1e-8, axis=1)
+        smooth_L_ref = L_ref if "L_ref" in locals() else L
         proposed_smoothness_raw = graph_smoothness_raw(result.B, L)
         proposed_smoothness_norm = graph_smoothness_norm(result.B, L)
+        proposed_smoothness_ref = graph_smoothness_norm(result.B, smooth_L_ref)
         proposed_eval = _canonical_method_metrics(
             dataset=dataset_name,
             graph_family=graph_family,
@@ -524,7 +575,7 @@ def run(config_path: str) -> None:
             graph_reference_id=dataset_meta.get("graph_reference_id", f"{graph_family}_clean"),
             explained_variance_value=explained_variance(orthonormalize(result.B), Sigma_hat),
             smoothness_used_graph=proposed_smoothness_norm,
-            smoothness_reference_graph=proposed_smoothness_norm,
+            smoothness_reference_graph=proposed_smoothness_ref,
             runtime_sec=0.0,
             iterations=solver_summary["iterations"],
             nnz=nnz_loadings(result.B),
@@ -597,6 +648,7 @@ def run(config_path: str) -> None:
         spca_union_mask = np.any(np.abs(spca_aligned) > 1e-8, axis=1)
         spca_smoothness_raw = graph_smoothness_raw(spca_result.B, L)
         spca_smoothness_norm = graph_smoothness_norm(spca_result.B, L)
+        spca_smoothness_ref = graph_smoothness_norm(spca_result.B, smooth_L_ref)
         spca_eval = _canonical_method_metrics(
             dataset=dataset_name,
             graph_family=graph_family,
@@ -620,7 +672,7 @@ def run(config_path: str) -> None:
                 orthonormalize(spca_result.B), Sigma_hat
             ),
             smoothness_used_graph=spca_smoothness_norm,
-            smoothness_reference_graph=spca_smoothness_norm,
+            smoothness_reference_graph=spca_smoothness_ref,
             runtime_sec=0.0,
             iterations=spca_summary["iterations"],
             nnz=nnz_loadings(spca_result.B),

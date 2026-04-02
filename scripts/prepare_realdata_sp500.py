@@ -36,7 +36,26 @@ def prepare_sp500_artifact(
         if tickers is None:
             raise ValueError("tickers required when prices not provided")
         data = yf.download(tickers, start=start, end=end, progress=False)
-        prices = data["Adj Close"].dropna()
+        if "Adj Close" in data.columns.get_level_values(0):
+            adj = data["Adj Close"]
+            if adj.shape[1] >= max(50, int(0.5 * len(tickers))):
+                prices = adj
+                price_field = "Adj Close"
+            else:
+                prices = data["Close"]
+                price_field = "Close"
+        else:
+            prices = data["Close"]
+            price_field = "Close"
+    else:
+        price_field = "provided"
+
+    # Keep tickers with sufficient coverage, then forward-fill remaining gaps.
+    min_obs = max(10, int(0.9 * len(prices)))
+    prices = prices.dropna(axis=1, thresh=min_obs)
+    prices = prices.ffill().dropna()
+    if prices.empty:
+        raise ValueError("No usable price series after filtering missing data.")
 
     W = _corr_graph(prices, corr_threshold)
     L = normalized_laplacian(W)
@@ -47,6 +66,7 @@ def prepare_sp500_artifact(
         "end": end,
         "corr_threshold": corr_threshold,
         "tickers": list(prices.columns),
+        "price_field": price_field,
     }
     artifact = DatasetArtifact(
         artifact_id="sp500_corr_v1",
