@@ -16,7 +16,12 @@ def _hash_config(payload: dict) -> str:
 
 def prepare_mnist_artifact(out_dir: Path, max_samples: int, resolution: int) -> None:
     mnist = fetch_openml("mnist_784", version=1)
-    X = mnist.data.to_numpy()[:max_samples] / 255.0
+    X = mnist.data.to_numpy()
+    if resolution * resolution > X.shape[1]:
+        raise ValueError(
+            f"resolution^2 ({resolution * resolution}) exceeds available features ({X.shape[1]})"
+        )
+    X = X[:max_samples] / 255.0
     X = X[:, : resolution * resolution]
 
     L, _ = grid_graph_laplacian(resolution, resolution)
