@@ -312,7 +312,7 @@ To test when the graph prior is genuinely helpful, we introduce a graph-aligned 
 We report synthetic results using shared evaluation metrics across all methods: union support F1, graph smoothness norm on the true graph, and shared explained variance (after QR orthonormalization). Shared explained variance is an evaluation metric and is not the training objective for any method. We do not compare raw objective values across methods because they optimize different objectives. Results are presented for chain and grid graphs across sweep seeds (0--2), with a chain baseline table across seeds 0--4 to anchor method comparison.
 
 \subsection{Chain \texorpdfstring{$\lambda_2$}{lambda2} Sweep}
-Figure~\ref{fig:chain-lambda2-sweep} reports the $\lambda_2$ sweep on chain graphs under clean, delete, and rewire priors. At low $\lambda_2$, curves overlap, indicating robustness when the graph prior is weak. At higher $\lambda_2$, the chain becomes misspecification-sensitive: clean retains higher recovery, deletion degrades moderately, and rewire degrades most. This establishes the chain mechanism: strong regularization amplifies errors in local adjacency.
+Figure~\ref{fig:chain-lambda2-sweep} reports the $\lambda_2$ sweep on chain graphs under clean, delete, and rewire priors. At low $\lambda_2$, curves overlap, indicating robustness when the graph prior is weak. At higher $\lambda_2$, the chain becomes misspecification-sensitive: clean retains higher recovery, deletion degrades moderately, and rewire degrades most, suggesting that in fragile topologies the regularization term quickly dominates the data-driven covariance signal. This establishes the chain mechanism: strong regularization amplifies errors in local adjacency.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{chain_lambda2_sweep_panel.png}
@@ -354,10 +354,10 @@ Figure~\ref{fig:phase2-compare} contrasts chain and grid under the same corrupti
 \end{figure}
 
 \paragraph{Illusory smoothness (quantified).}
-At $\lambda_2=0.5$ and $\alpha=0.2$ on the chain, rewiring reduces the imposed-graph Laplacian energy from $1.916$ to $1.599$ ($\Delta=-0.317$) while support F1 drops by $0.058$ (mean over seeds $0$--$2$), illustrating that smoothness under a corrupted prior can improve even as true-support recovery worsens.
+At $\lambda_2=0.5$ and $\alpha=0.2$ on the chain, rewiring reduces the imposed-graph Laplacian energy from $1.916$ to $1.599$ ($\Delta=-0.317$) while true-graph smoothness worsens (mean increases by $0.323$) and support F1 drops by $0.058$ (mean over seeds $0$--$2$), illustrating that smoothness under a corrupted prior can improve even as fidelity to the true graph and recovery degrade.
 
 \subsection{Corruption Phase Diagram}
-Figure~\ref{fig:phase2-alpha} reports a phase diagram over $(\lambda_2,\alpha)$ for chain graphs, with separate panels for deletion and rewiring. Misspecification effects strengthen with increasing $\alpha$, and the most pronounced degradation occurs when both $\lambda_2$ and $\alpha$ are large. The diagram summarizes the regime boundary between robust low-$\lambda_2$ behavior and high-$\lambda_2$ sensitivity to corruption.
+Figure~\ref{fig:phase2-alpha} reports a phase diagram over $(\lambda_2,\alpha)$ for chain graphs, with separate panels for deletion and rewiring. The color scale shows absolute support F1 on the true graph. Misspecification effects strengthen with increasing $\alpha$, and the most pronounced degradation occurs when both $\lambda_2$ and $\alpha$ are large. The diagram summarizes the regime boundary between robust low-$\lambda_2$ behavior and high-$\lambda_2$ sensitivity to corruption.
 Appendix~\ref{app:topology} reports SBM and kNN misspecification results that follow the same topology-dependent pattern.
 \begin{figure}[t]
 \centering
@@ -396,7 +396,7 @@ The main limitation of the current evidence is its synthetic emphasis and narrow
 \section{Conclusion}
 \label{sec:conclusion}
 
-Graph regularization is not universally helpful. Its reliability depends on regularization strength and topology, and smoothness under the imposed graph can be misleading under misspecification. In aligned settings, however, graph priors can improve structural coherence without sacrificing recovery. These findings support a modest, defensible claim: use graph regularization with topology-aware tuning and interpret smoothness gains cautiously.
+Graph regularization is not universally helpful. Its reliability depends on regularization strength and topology, and smoothness under the imposed graph can be misleading under misspecification. In aligned settings, however, graph priors can improve structural coherence without sacrificing recovery. These findings support a modest, defensible claim: use graph regularization with topology-aware tuning and interpret smoothness gains cautiously, especially when the graph is sparse or known to be noisy.
 
 \appendix
 
