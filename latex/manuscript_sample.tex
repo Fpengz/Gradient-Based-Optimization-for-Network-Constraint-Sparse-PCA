@@ -88,6 +88,8 @@ Concretely, we introduce a graph-smooth sparse orthogonal PCA formulation in whi
 
 Our study is guided by two central questions. First, when does feature-graph regularization preserve recovery while improving structural coherence of sparse components? Second, what tradeoff does graph regularization induce between explained variance, graph consistency, and computational cost? These questions are important because graph-based regularization can help when the prior graph is informative, but may oversmooth the loadings or reduce variance capture when the graph is misspecified. Accordingly, the paper emphasizes not only model design and optimization, but also the empirical circumstances under which graph priors are beneficial.
 
+We show that graph regularization in sparse PCA induces a topology-dependent regime behavior: it improves structural coherence consistently, but its effect on recovery depends on graph topology and regularization strength. This has practical implications in settings where the feature graph is uncertain or noisy (e.g., biological networks or financial correlations), as overly strong regularization can degrade recovery. Unlike prior graph-aware PCA work that focuses on performance improvements under aligned settings, our study explicitly characterizes failure modes under misspecification and shows that robustness is governed by graph topology. We intentionally use a minimal alternating proximal-gradient scheme to isolate the effect of graph regularization rather than optimization complexity.
+
 \paragraph{Contributions.}
 The main contributions of this work are as follows.
 \begin{itemize}[leftmargin=*]
@@ -262,6 +264,7 @@ Algorithm~\ref{alg:alt} summarizes the outer loop.
 
 \paragraph{Complexity.}
 The cost of the $A$-step is dominated by matrix multiplications and the chosen retraction. The $B$-step is typically the computational bottleneck because graph regularization introduces feature coupling and removes the closed-form separability available in plain soft-thresholding. When $L$ is sparse, matrix-vector operations remain efficient; dense or ill-conditioned graph operators can substantially increase runtime.
+Graph regularization increases computational cost due to feature coupling, particularly for dense or ill-conditioned graphs.
 
 \section{Optimization Discussion}
 \label{sec:theory}
@@ -419,6 +422,8 @@ We now study how these behaviors change when the graph prior is misspecified.
 To study the effect of graph misspecification, we apply controlled edge rewiring at corruption level $\alpha$ and evaluate performance relative to the clean graph baseline at the same $\lambda_2$. Figure~\ref{fig:corruption_phase} presents phase diagrams over $(\lambda_2,\alpha)$ for different graph topologies.
 
 We observe a clear topology-dependent pattern. For the chain graph, performance degrades substantially as both $\lambda_2$ and $\alpha$ increase, indicating that sparse, fragile structures are highly sensitive to misspecification. In contrast, grid, SBM, and kNN graphs exhibit markedly greater robustness: performance remains stable across a wide range of corruption levels, and in some regimes shows slight improvements relative to the clean graph.
+\textbf{This demonstrates that robustness to graph misspecification is not uniform, but fundamentally governed by graph redundancy.}
+We use ``fragile'' to denote low-redundancy graphs (e.g., chains) where connectivity relies on few edges, and ``redundant'' to denote graphs with multiple alternative paths (e.g., grids, SBM, kNN).
 
 This contrast is summarized in Figure~\ref{fig:corruption_summary}, which reports the change in support F1 at a representative high-regularization setting ($\lambda_2=0.5,\alpha=0.4$). The chain graph shows a clear degradation ($-0.097 \pm 0.021$), whereas grid ($+0.041 \pm 0.019$), SBM ($+0.021 \pm 0.013$), and kNN ($+0.047 \pm 0.014$) exhibit little degradation or slight improvement.
 
@@ -442,6 +447,7 @@ These results suggest that the effect of graph regularization under misspecifica
 \subsection{Real-Data Trends}
 We report $\lambda_2$ sweeps on TCGA-BRCA (STRING), MNIST (grid), and S\&P500 (correlation) to assess how the graph prior affects variance--smoothness tradeoffs in realistic settings (Figure~\ref{fig:realdata-unified}).
 These trends are consistent with the topology-dependent behavior observed in synthetic experiments: MNIST (grid-like) exhibits stable performance across $\lambda_2$, TCGA-BRCA (modular) shows moderate sensitivity, and S\&P500 (noisy correlation graph) is more sensitive at higher $\lambda_2$.
+These results suggest that real-world graphs behave similarly to their synthetic analogues: grid-like structures (MNIST) are robust, while noisier correlation graphs (S\&P500) are more sensitive to regularization strength.
 
 \begin{figure}[t]
 \centering
@@ -466,9 +472,9 @@ Despite expanded graph families, our experiments still cover a limited subset of
 \section{Conclusion}
 \label{sec:conclusion}
 
-We present synthetic evidence that graph-regularized sparse orthogonal PCA improves structural coherence while inducing a topology-dependent tradeoff with support recovery. On chain graphs, the proposed method is competitive on recovery and yields smoother supports; on SBM graphs, stronger graph regularization improves smoothness but reduces recovery accuracy. In a graph-aligned chain setting with disjoint contiguous supports and scattered decoys, moderate regularization preserves recovery while improving support connectivity. These findings highlight the need for topology-aware $\lambda_2$ tuning and support a modest, defensible claim: graph regularization improves structural coherence, and its recovery impact depends on topology and regularization strength.
+We present controlled empirical evidence that graph-regularized sparse orthogonal PCA improves structural coherence while inducing a topology-dependent tradeoff with support recovery. On chain graphs, the proposed method is competitive on recovery and yields smoother supports; on SBM graphs, stronger graph regularization improves smoothness but reduces recovery accuracy. In a graph-aligned chain setting with disjoint contiguous supports and scattered decoys, moderate regularization preserves recovery while improving support connectivity. These findings highlight the need for topology-aware $\lambda_2$ tuning and support a modest, defensible claim: graph regularization improves structural coherence, and its recovery impact depends on topology and regularization strength.
 
-A key takeaway is that the effect of graph regularization depends critically on graph topology. Sparse, fragile graphs such as chains are highly sensitive to misspecification, while redundant graphs such as grids, SBM, and kNN are more robust and can even alleviate oversmoothing in certain regimes. This suggests that the usefulness of graph priors in sparse PCA is not universal, but depends on structural redundancy in the underlying graph. Understanding this distinction is essential when applying graph-regularized methods in practice.
+A key takeaway is that the effect of graph regularization depends critically on graph topology. Sparse, fragile graphs such as chains are highly sensitive to misspecification, while redundant graphs such as grids, SBM, and kNN are more robust and can even alleviate oversmoothing in certain regimes. This suggests that the usefulness of graph priors in sparse PCA is not universal, but depends on structural redundancy in the underlying graph. Understanding this distinction is essential when applying graph-regularized methods in practice. While our study focuses on PCA, the observed topology-dependent behavior is likely relevant to other graph-regularized learning problems where structural priors interact with sparsity.
 
 \fussy
 \bibliographystyle{plain}
