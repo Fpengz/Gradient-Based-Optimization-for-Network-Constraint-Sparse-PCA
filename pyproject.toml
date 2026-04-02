@@ -14,6 +14,3 @@ dependencies = [
   "scikit-learn",
   "yfinance",
 ]
-
-[tool.pytest.ini_options]
-pythonpath = [".", "src"]
