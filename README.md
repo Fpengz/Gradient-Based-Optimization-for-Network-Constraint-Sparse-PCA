@@ -1,6 +1,6 @@
-# GRPCA-GD
+# TopoSPCA
 
-Graph-smooth sparse orthogonal PCA with a split-variable solver and a synthetic-first evaluation. This repository contains the Track-A manuscript, code, and reproducible synthetic experiments.
+Topology-Dependent Robustness in Graph-Regularized Sparse PCA. This repository contains the Track-A manuscript, code, and reproducible synthetic experiments.
 
 ## Methods Compared (Paper-1)
 - PCA (dense baseline)
