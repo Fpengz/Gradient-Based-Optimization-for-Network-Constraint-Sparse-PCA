@@ -1,6 +1,6 @@
 import numpy as np
 
-from grpca_gd.metrics import match_components
+from topospca.metrics import match_components
 
 
 def test_matching_sign_and_perm():

@@ -1,6 +1,6 @@
 import numpy as np
 
-from grpca_gd.synthetic.support import generate_supports
+from topospca.synthetic.support import generate_supports
 
 
 def test_multi_cluster_support_sizes():

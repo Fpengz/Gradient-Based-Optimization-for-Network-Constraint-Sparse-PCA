@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from grpca_gd.runner import run
+from topospca.runner import run
 
 
 ROOT = Path(__file__).resolve().parents[1]
