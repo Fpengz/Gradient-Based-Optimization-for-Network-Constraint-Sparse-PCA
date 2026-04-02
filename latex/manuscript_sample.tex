@@ -86,14 +86,14 @@ This paper studies that question. We consider a formulation that combines three 
 
 Concretely, we introduce a graph-smooth sparse orthogonal PCA formulation in which orthogonality is handled through a Stiefel-constrained variable and structured sparse estimation is handled through a graph-regularized Euclidean variable coupled by a quadratic penalty. This split allows us to separate the geometry of orthogonality from the graph-coupled sparsity structure, while still optimizing the two jointly. The resulting viewpoint is particularly attractive in settings where interpretability is not just a matter of selecting a few variables, but of selecting variables whose pattern is coherent with known domain structure.
 
-Our study is guided by two central questions. First, when does feature-graph regularization preserve recovery while improving structural coherence of sparse components? Second, what tradeoff does graph regularization induce between explained variance, graph consistency, and computational cost? These questions are important because graph-based regularization can help when the prior graph is informative, but may oversmooth the loadings or reduce variance capture when the graph is misspecified. Accordingly, the paper emphasizes not only model design and optimization, but also the empirical circumstances under which graph priors are beneficial.
+Our study is guided by a single question: when is graph regularization reliable under misspecification? We take a regime view in which the effect of graph regularization depends jointly on $\lambda_2$ and topology: weak regularization behaves robustly across priors, while stronger regularization can amplify errors on fragile graphs but remain stable on redundant graphs. This framing highlights a concrete mechanism: chains rely on precise adjacency, whereas grids admit redundant paths that dampen perturbation effects. The paper therefore emphasizes empirical circumstances under which graph priors help or hurt, rather than asserting universal gains.
 
 \paragraph{Contributions.}
 The main contributions of this work are as follows.
 \begin{itemize}[leftmargin=*]
-    \item Graph regularization consistently reduces the chosen graph-smoothness metric on the true graph, while its recovery impact depends on topology.
-    \item On chain graphs, recovery remains competitive with sparse baselines while smoothness improves; on SBM graphs, stronger regularization induces a clearer recovery--smoothness tradeoff.
-    \item In a graph-aligned chain setting with disjoint contiguous supports and scattered high-variance decoys, moderate regularization preserves recovery while improving support connectivity and smoothness.
+    \item We map a controlled misspecification regime on chain and grid graphs, showing that weak regularization is broadly robust while stronger regularization produces topology-dependent degradation on fragile graphs.
+    \item We quantify an \emph{illusory smoothness} effect in which smoothness under the imposed prior can improve even as true-support recovery worsens.
+    \item We identify a graph-aligned positive case in which regularization improves structural coherence without sacrificing recovery, and include a small TCGA-BRCA sanity check.
     \item We provide a concrete split-variable solver that combines explicit orthogonality, sparsity, and graph smoothness within a single executable framework.
 \end{itemize}
 
