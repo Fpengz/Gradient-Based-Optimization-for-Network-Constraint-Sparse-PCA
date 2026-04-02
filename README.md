@@ -11,6 +11,8 @@ Current worktrees:
   Branch: `paper-trackA-phase2-final` (authoritative Track A paper state)
 - **Historical worktree:** `/Users/zhoufuwang/Projects/GRPCA-GD/.worktrees/paper-trackA-phase1-revision`  
   Branch: `paper-trackA-phase1-revision` (legacy snapshot)
+- **Track B Phase 1.5 worktree:** `/Users/zhoufuwang/Projects/GRPCA-GD/.worktrees/paper-trackB-phase1.5-claim-hardening`  
+  Branch: `paper-trackB-phase1.5-claim-hardening`
 
 Naming convention (must be adhered to for both branch and folder names):
 - Worktree directories: `GRPCA-GD/.worktrees/<branch-name>`
