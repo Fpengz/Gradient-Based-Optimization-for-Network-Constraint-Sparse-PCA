@@ -14,3 +14,8 @@
 - `figures/corruption_phase_panels.png`
 - `figures/corruption_delta_summary.png`
 - `figures/realdata/realdata_unified_panels.png`
+
+## Numerical Warning Policy
+- Runs with `runtime_warnings_count > 0` are flagged in manifests.
+- Summary tables report whether flagged runs were included or excluded.
+- Exclusion rules (if any) must be fixed in advance and documented with the table.

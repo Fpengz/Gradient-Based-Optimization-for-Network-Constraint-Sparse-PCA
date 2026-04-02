@@ -482,7 +482,7 @@ The chain setting aligns naturally with local smoothness, whereas the SBM settin
 The main limitation of the current evidence is that it remains synthetic and focuses on two graph families with a single data generator. This is appropriate for a focused empirical study, whose goal is to establish a disciplined method and a clear empirical tradeoff. The results demonstrate that structural priors can improve graph coherence, but they also show that regularization strength must be tuned to topology. If the graph-aligned setting fails to preserve recovery, the correct conclusion is a tradeoff characterization rather than a recovery-improving claim.
 
 \paragraph{Threats to validity.}
-Despite expanded graph families, our experiments still cover a limited subset of possible topologies. The S\&P500 correlation graph is a noisy proxy for true relationships, and real data lacks ground-truth supports. Implementations share a common NumPy codebase and are not equivalently optimized, so runtime comparisons are indicative only. Finally, hyperparameter tuning choices can influence regime boundaries.
+Despite expanded graph families, our experiments still cover a limited subset of possible topologies. The S\&P500 correlation graph is a noisy proxy for true relationships, and real data lacks ground-truth supports. Implementations share a common NumPy codebase and are not equivalently optimized, so runtime comparisons are indicative only. Some solver calls produced runtime warnings in stressed regimes; all outputs were logged and checked for finite reported metrics, and warning-aware logging was used to prevent silent corruption. Finally, hyperparameter tuning choices can influence regime boundaries.
 
 \section{Conclusion}
 \label{sec:conclusion}
